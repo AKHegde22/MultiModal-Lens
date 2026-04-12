@@ -1,0 +1,27 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Packaging artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Exported analysis artifacts
+artifacts/
+reports/
+
+
+# OS files
+.DS_Store
