@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout
@@ -30,8 +30,8 @@ jobs:
       - name: Ruff
         run: ruff check src scripts tests
 
-      - name: Pytest
-        run: pytest -q
+      - name: Pytest (Fast)
+        run: pytest -q -m "not slow"
 
   build-check:
     runs-on: ubuntu-latest

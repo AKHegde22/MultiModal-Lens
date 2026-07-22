@@ -447,132 +447,139 @@ def run_explore(
     image: Image.Image | None,
     prompt: str,
 ):
-    _validate_inputs(image, prompt)
-    assert image is not None
+    try:
+        _validate_inputs(image, prompt)
+        assert image is not None
 
-    preflight_lines, preflight_notes = _collect_preflight_lines(
-        family=family,
-        model_name=model_name,
-        trust_remote_code=trust_remote_code,
-    )
-
-    result = PIPELINE.analyze(
-        family=family,
-        model_name=model_name,
-        image=image.convert("RGB"),
-        prompt=prompt,
-        device=device,
-        dtype=dtype,
-        trust_remote_code=trust_remote_code,
-        compute_gradients=compute_gradients,
-        run_faithfulness=run_faithfulness,
-    )
-
-    vision_map = result.attention_maps["vision_rollout"]
-    overlay = overlay_heatmap(image, vision_map, alpha=0.42, colormap="inferno")
-
-    align_fig = plot_alignment(result.tokens, result.alignment_matrix)
-    token_fig = plot_token_scores(result.tokens, result.token_scores)
-
-    token_df = pd.DataFrame(
-        {
-            "token": result.tokens,
-            "score": result.token_scores,
-        }
-    ).sort_values("score", ascending=False)
-
-    lines = [
-        *preflight_lines,
-        f"Model: `{result.model_name}` ({result.model_family})",
-        f"Global score: `{result.global_score:.6f}`",
-        f"Patch grid: `{result.patch_grid[0]} x {result.patch_grid[1]}`",
-        f"Tokens: `{len(result.tokens)}`",
-    ]
-
-    if "vision_grad" in result.attention_maps:
-        lines.append("Gradient attribution computed: `yes`")
-
-    if preflight_notes:
-        lines.extend(preflight_notes)
-
-    faith_fig = None
-    faith_df = pd.DataFrame(columns=["metric", "value"])
-
-    if result.faithfulness is not None:
-        faith_fig = plot_faithfulness_curves(
-            result.faithfulness.deletion_curve,
-            result.faithfulness.insertion_curve,
-        )
-        faith_rows = [
-            ("counterfactual_drop", result.faithfulness.counterfactual_drop),
-            ("attn_grad_spearman", result.faithfulness.attn_grad_spearman),
-            ("deletion_auc", float(sum(result.faithfulness.deletion_curve))),
-            ("insertion_auc", float(sum(result.faithfulness.insertion_curve))),
-        ]
-        faith_df = pd.DataFrame(faith_rows, columns=["metric", "value"])
-
-    mech_summary = "Mechanistic suite not run. Enable `Run mechanistic suite` to compute all 4 probes."
-    mech_table = pd.DataFrame(columns=["probe", "metric", "value"])
-    mech_json = "{}"
-    mech_payload: dict[str, Any] | None = None
-    mech_layers: dict[str, np.ndarray] | None = None
-
-    if run_mechanistic_suite:
-        (
-            mech_summary,
-            mech_table,
-            mech_json,
-            mech_payload,
-            mech_layers,
-        ) = _run_mechanistic_suite(
+        preflight_lines, preflight_notes = _collect_preflight_lines(
             family=family,
             model_name=model_name,
+            trust_remote_code=trust_remote_code,
+        )
+
+        result = PIPELINE.analyze(
+            family=family,
+            model_name=model_name,
+            image=image.convert("RGB"),
+            prompt=prompt,
             device=device,
             dtype=dtype,
             trust_remote_code=trust_remote_code,
-            image=image,
-            prompt=prompt,
-            reference_result=result,
-            include_patterns_raw=mech_include_patterns_raw,
-            positions_raw=mech_positions_raw,
-            layer_index=mech_layer_index,
-            top_k=mech_top_k,
-            max_tokens=mech_max_tokens,
-            max_layers=mech_max_layers,
-            mask_fraction=mech_mask_fraction,
-            visual_only=mech_visual_only,
+            compute_gradients=compute_gradients,
+            run_faithfulness=run_faithfulness,
         )
 
-    diagnostics = "\n".join(lines)
-    bundle = _export_explore_bundle(
-        result=result,
-        overlay=overlay,
-        align_fig=align_fig,
-        token_fig=token_fig,
-        token_df=token_df,
-        diagnostics=diagnostics,
-        faith_fig=faith_fig,
-        faith_df=faith_df,
-        mechanistic_summary=mech_summary,
-        mechanistic_table=mech_table,
-        mechanistic_payload=mech_payload,
-        mechanistic_layer_arrays=mech_layers,
-    )
+        vision_map = result.attention_maps["vision_rollout"]
+        overlay = overlay_heatmap(image, vision_map, alpha=0.42, colormap="inferno")
 
-    return (
-        result.global_score,
-        overlay,
-        align_fig,
-        token_fig,
-        token_df,
-        diagnostics,
-        faith_fig,
-        faith_df,
-        mech_summary,
-        mech_table,
-        mech_json,
-        bundle,
-    )
+        align_fig = plot_alignment(result.tokens, result.alignment_matrix)
+        token_fig = plot_token_scores(result.tokens, result.token_scores)
+
+        token_df = pd.DataFrame(
+            {
+                "token": result.tokens,
+                "score": result.token_scores,
+            }
+        ).sort_values("score", ascending=False)
+
+        lines = [
+            *preflight_lines,
+            f"Model: `{result.model_name}` ({result.model_family})",
+            f"Global score: `{result.global_score:.6f}`",
+            f"Patch grid: `{result.patch_grid[0]} x {result.patch_grid[1]}`",
+            f"Tokens: `{len(result.tokens)}`",
+        ]
+
+        if "vision_grad" in result.attention_maps:
+            lines.append("Gradient attribution computed: `yes`")
+
+        if preflight_notes:
+            lines.extend(preflight_notes)
+
+        faith_fig = None
+        faith_df = pd.DataFrame(columns=["metric", "value"])
+
+        if result.faithfulness is not None:
+            faith_fig = plot_faithfulness_curves(
+                result.faithfulness.deletion_curve,
+                result.faithfulness.insertion_curve,
+            )
+            faith_rows = [
+                ("counterfactual_drop", result.faithfulness.counterfactual_drop),
+                ("attn_grad_spearman", result.faithfulness.attn_grad_spearman),
+                ("deletion_auc", float(sum(result.faithfulness.deletion_curve))),
+                ("insertion_auc", float(sum(result.faithfulness.insertion_curve))),
+            ]
+            faith_df = pd.DataFrame(faith_rows, columns=["metric", "value"])
+
+        mech_summary = "Mechanistic suite not run. Enable `Run mechanistic suite` to compute all 4 probes."
+        mech_table = pd.DataFrame(columns=["probe", "metric", "value"])
+        mech_json = "{}"
+        mech_payload: dict[str, Any] | None = None
+        mech_layers: dict[str, np.ndarray] | None = None
+
+        if run_mechanistic_suite:
+            (
+                mech_summary,
+                mech_table,
+                mech_json,
+                mech_payload,
+                mech_layers,
+            ) = _run_mechanistic_suite(
+                family=family,
+                model_name=model_name,
+                device=device,
+                dtype=dtype,
+                trust_remote_code=trust_remote_code,
+                image=image,
+                prompt=prompt,
+                reference_result=result,
+                include_patterns_raw=mech_include_patterns_raw,
+                positions_raw=mech_positions_raw,
+                layer_index=mech_layer_index,
+                top_k=mech_top_k,
+                max_tokens=mech_max_tokens,
+                max_layers=mech_max_layers,
+                mask_fraction=mech_mask_fraction,
+                visual_only=mech_visual_only,
+            )
+
+        diagnostics = "\n".join(lines)
+        explore_bundle = _export_explore_bundle(
+            result=result,
+            overlay=overlay,
+            align_fig=align_fig,
+            token_fig=token_fig,
+            token_df=token_df,
+            diagnostics=diagnostics,
+            faith_fig=faith_fig,
+            faith_df=faith_df,
+            mechanistic_summary=mech_summary,
+            mechanistic_table=mech_table,
+            mechanistic_payload=mech_payload,
+            mechanistic_layer_arrays=mech_layers,
+        )
+
+        return (
+            result.global_score,
+            overlay,
+            align_fig,
+            token_fig,
+            token_df,
+            diagnostics,
+            faith_fig,
+            faith_df,
+            mech_summary,
+            mech_table,
+            mech_json,
+            explore_bundle,
+        )
+    except gr.Error:
+        raise
+    except Exception as exc:
+        if "OutOfMemoryError" in type(exc).__name__ or "CUDA out of memory" in str(exc):
+            raise gr.Error("GPU out of memory. Try a smaller model or precision='float16' / 'bfloat16'.") from exc
+        raise gr.Error(f"Analysis failed: {exc}") from exc
 
 
 def run_compare(
@@ -585,79 +592,85 @@ def run_compare(
     prompt_a: str,
     prompt_b: str,
 ):
-    _validate_inputs(image, prompt_a)
-    _validate_inputs(image, prompt_b)
-    assert image is not None
+    try:
+        _validate_inputs(image, prompt_a)
+        _validate_inputs(image, prompt_b)
+        assert image is not None
 
-    preflight_lines, preflight_notes = _collect_preflight_lines(
-        family=family,
-        model_name=model_name,
-        trust_remote_code=trust_remote_code,
-    )
+        preflight_lines, preflight_notes = _collect_preflight_lines(
+            family=family,
+            model_name=model_name,
+            trust_remote_code=trust_remote_code,
+        )
 
-    res_a, res_b = PIPELINE.compare_prompts(
-        family=family,
-        model_name=model_name,
-        image=image.convert("RGB"),
-        prompt_a=prompt_a,
-        prompt_b=prompt_b,
-        device=device,
-        dtype=dtype,
-        trust_remote_code=trust_remote_code,
-    )
+        res_a, res_b = PIPELINE.compare_prompts(
+            family=family,
+            model_name=model_name,
+            image=image.convert("RGB"),
+            prompt_a=prompt_a,
+            prompt_b=prompt_b,
+            device=device,
+            dtype=dtype,
+            trust_remote_code=trust_remote_code,
+        )
 
-    overlay_a = overlay_heatmap(image, res_a.attention_maps["vision_rollout"], alpha=0.42, colormap="inferno")
-    overlay_b = overlay_heatmap(image, res_b.attention_maps["vision_rollout"], alpha=0.42, colormap="inferno")
+        overlay_a = overlay_heatmap(image, res_a.attention_maps["vision_rollout"], alpha=0.42, colormap="inferno")
+        overlay_b = overlay_heatmap(image, res_b.attention_maps["vision_rollout"], alpha=0.42, colormap="inferno")
 
-    token_fig_a = plot_token_scores(res_a.tokens, res_a.token_scores)
-    token_fig_b = plot_token_scores(res_b.tokens, res_b.token_scores)
+        token_fig_a = plot_token_scores(res_a.tokens, res_a.token_scores)
+        token_fig_b = plot_token_scores(res_b.tokens, res_b.token_scores)
 
-    compare_df = pd.DataFrame(
-        [
-            {
-                "prompt": prompt_a,
-                "global_score": res_a.global_score,
-                "num_tokens": len(res_a.tokens),
-                "num_patches": res_a.patch_grid[0] * res_a.patch_grid[1],
-            },
-            {
-                "prompt": prompt_b,
-                "global_score": res_b.global_score,
-                "num_tokens": len(res_b.tokens),
-                "num_patches": res_b.patch_grid[0] * res_b.patch_grid[1],
-            },
-        ]
-    )
+        compare_df = pd.DataFrame(
+            [
+                {
+                    "prompt": prompt_a,
+                    "global_score": res_a.global_score,
+                    "num_tokens": len(res_a.tokens),
+                    "num_patches": res_a.patch_grid[0] * res_a.patch_grid[1],
+                },
+                {
+                    "prompt": prompt_b,
+                    "global_score": res_b.global_score,
+                    "num_tokens": len(res_b.tokens),
+                    "num_patches": res_b.patch_grid[0] * res_b.patch_grid[1],
+                },
+            ]
+        )
 
-    delta = res_a.global_score - res_b.global_score
-    summary = (
-        "\n".join(preflight_lines)
-        + "\n"
-        f"Prompt A score: `{res_a.global_score:.6f}`\n"
-        f"Prompt B score: `{res_b.global_score:.6f}`\n"
-        f"Delta (A-B): `{delta:.6f}`"
-    )
-    if preflight_notes:
-        summary += "\n" + "\n".join(preflight_notes)
+        delta = res_a.global_score - res_b.global_score
+        summary = (
+            "\n".join(preflight_lines)
+            + "\n"
+            f"Prompt A score: `{res_a.global_score:.6f}`\n"
+            f"Prompt B score: `{res_b.global_score:.6f}`\n"
+            f"Delta (A-B): `{delta:.6f}`"
+        )
+        if preflight_notes:
+            summary += "\n" + "\n".join(preflight_notes)
 
-    bundle = _export_compare_bundle(
-        family=family,
-        model_name=model_name,
-        prompt_a=prompt_a,
-        prompt_b=prompt_b,
-        compare_df=compare_df,
-        overlay_a=overlay_a,
-        overlay_b=overlay_b,
-        token_fig_a=token_fig_a,
-        token_fig_b=token_fig_b,
-        summary=summary,
-    )
+        bundle = _export_compare_bundle(
+            family=family,
+            model_name=model_name,
+            prompt_a=prompt_a,
+            prompt_b=prompt_b,
+            compare_df=compare_df,
+            overlay_a=overlay_a,
+            overlay_b=overlay_b,
+            token_fig_a=token_fig_a,
+            token_fig_b=token_fig_b,
+            summary=summary,
+        )
 
-    return compare_df, overlay_a, overlay_b, token_fig_a, token_fig_b, summary, bundle
+        return compare_df, overlay_a, overlay_b, token_fig_a, token_fig_b, summary, bundle
+    except gr.Error:
+        raise
+    except Exception as exc:
+        raise gr.Error(f"Comparison failed: {exc}") from exc
 
 
 def run_eval(
     dataset_path: str,
+    dataset_file: str | None,
     family: str,
     model_name: str,
     device: str,
@@ -666,43 +679,52 @@ def run_eval(
     compute_gradients: bool,
     run_faithfulness: bool,
 ):
-    path = Path(dataset_path).expanduser()
-    if not path.exists():
-        raise gr.Error(f"Dataset not found: {path}")
+    try:
+        effective_path = dataset_file if dataset_file else dataset_path
+        if not effective_path:
+            raise gr.Error("Please enter a JSONL dataset path or upload a JSONL file.")
 
-    preflight_lines, preflight_notes = _collect_preflight_lines(
-        family=family,
-        model_name=model_name,
-        trust_remote_code=trust_remote_code,
-    )
+        path = Path(effective_path).expanduser()
+        if not path.exists():
+            raise gr.Error(f"Dataset file not found: {path}")
 
-    df = EVAL_RUNNER.run(
-        dataset_path=path,
-        family=family,
-        model_name=model_name,
-        device=device,
-        dtype=dtype,
-        trust_remote_code=trust_remote_code,
-        compute_gradients=compute_gradients,
-        run_faithfulness=run_faithfulness,
-    )
+        preflight_lines, preflight_notes = _collect_preflight_lines(
+            family=family,
+            model_name=model_name,
+            trust_remote_code=trust_remote_code,
+        )
 
-    summary_lines = [
-        *preflight_lines,
-        f"Rows evaluated: `{len(df)}`",
-        f"Mean global score: `{df['global_score'].mean():.6f}`" if not df.empty else "No rows evaluated.",
-    ]
+        df = EVAL_RUNNER.run(
+            dataset_path=path,
+            family=family,
+            model_name=model_name,
+            device=device,
+            dtype=dtype,
+            trust_remote_code=trust_remote_code,
+            compute_gradients=compute_gradients,
+            run_faithfulness=run_faithfulness,
+        )
 
-    if "counterfactual_drop" in df.columns:
-        summary_lines.append(f"Mean counterfactual drop: `{df['counterfactual_drop'].mean():.6f}`")
-    if "attn_grad_spearman" in df.columns:
-        summary_lines.append(f"Mean attn-grad spearman: `{df['attn_grad_spearman'].mean():.6f}`")
-    summary_lines.extend(preflight_notes)
+        summary_lines = [
+            *preflight_lines,
+            f"Rows evaluated: `{len(df)}`",
+            f"Mean global score: `{df['global_score'].mean():.6f}`" if not df.empty else "No rows evaluated.",
+        ]
 
-    summary = "\n".join(summary_lines)
-    bundle = _export_eval_bundle(df=df, summary=summary, dataset_path=path, family=family, model_name=model_name)
+        if "counterfactual_drop" in df.columns:
+            summary_lines.append(f"Mean counterfactual drop: `{df['counterfactual_drop'].mean():.6f}`")
+        if "attn_grad_spearman" in df.columns:
+            summary_lines.append(f"Mean attn-grad spearman: `{df['attn_grad_spearman'].mean():.6f}`")
+        summary_lines.extend(preflight_notes)
 
-    return df, summary, bundle
+        summary = "\n".join(summary_lines)
+        bundle = _export_eval_bundle(df=df, summary=summary, dataset_path=path, family=family, model_name=model_name)
+
+        return df, summary, bundle
+    except gr.Error:
+        raise
+    except Exception as exc:
+        raise gr.Error(f"Evaluation failed: {exc}") from exc
 
 
 def _bind_family_to_default(family: str):
@@ -710,60 +732,71 @@ def _bind_family_to_default(family: str):
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="MultimodalLens") as demo:
+    with gr.Blocks(title="MultimodalLens v0.2.0", theme=gr.themes.Soft()) as demo:
         gr.Markdown(
-            "# MultimodalLens\n"
-            "Interactive debugger for multimodal transformers: attention maps, token-image alignments, "
-            "and cross-modal similarity diagnostics."
+            "# MultimodalLens 🔍\n"
+            "*Mechanistic Interpretability Toolkit for Vision-Language Models*\n\n"
+            "Analyze attention rollout, token-patch alignment, logit lens predictions, "
+            "activation patching, and visual grounding circuits."
         )
 
         with gr.Tab("Explore"):
             with gr.Row():
+                model_name = gr.Textbox(
+                    value=DEFAULT_MODELS["auto"],
+                    label="Model Checkpoint",
+                    placeholder="e.g. openai/clip-vit-base-patch32, llava-hf/llava-1.5-7b-hf",
+                    scale=3,
+                )
                 family = gr.Dropdown(
                     choices=SUPPORTED_FAMILIES,
                     value="auto",
                     label="Model Family",
                     allow_custom_value=True,
-                )
-                model_name = gr.Textbox(value=DEFAULT_MODELS["auto"], label="Model Checkpoint")
-                device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
-                dtype = gr.Dropdown(
-                    choices=["float16", "bfloat16", "float32"],
-                    value="float16",
-                    label="Precision",
+                    scale=1,
                 )
 
-            with gr.Row():
-                trust_remote_code = gr.Checkbox(value=False, label="trust_remote_code")
-                compute_gradients = gr.Checkbox(value=False, label="Compute gradient attributions")
-                run_faithfulness = gr.Checkbox(value=False, label="Run faithfulness diagnostics")
-
-            with gr.Row():
-                run_mechanistic_suite = gr.Checkbox(value=False, label="Run mechanistic suite (4 probes)")
-                mech_layer_index = gr.Number(value=12, precision=0, label="Patch Layer Index")
-                mech_top_k = gr.Number(value=20, precision=0, label="Top-K (logit lens/grounding)")
-                mech_mask_fraction = gr.Slider(
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.3,
-                    step=0.05,
-                    label="Mask Fraction (patch/grounding)",
-                )
-                mech_visual_only = gr.Checkbox(value=True, label="Visual-only patching when supported")
-
-            with gr.Row():
-                mech_patterns = gr.Textbox(
-                    label="Layer Patterns (regex; comma/newline separated)",
-                    lines=2,
-                    placeholder="language_model\\.model\\.layers, vision_model\\.encoder\\.layers",
-                )
-                mech_positions = gr.Textbox(label="Logit Lens Positions", value="-1")
-                mech_max_tokens = gr.Number(value=256, precision=0, label="Cache Max Tokens")
-                mech_max_layers = gr.Number(value=0, precision=0, label="Logit Lens Max Layers (0 = all)")
+            with gr.Accordion("Model & Runtime Settings", open=False):
+                with gr.Row():
+                    device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
+                    dtype = gr.Dropdown(
+                        choices=["float16", "bfloat16", "float32"],
+                        value="float16",
+                        label="Precision",
+                    )
+                    trust_remote_code = gr.Checkbox(value=False, label="trust_remote_code")
 
             with gr.Row():
                 image = gr.Image(type="pil", label="Input Image")
                 prompt = gr.Textbox(label="Prompt", lines=5, placeholder="Describe the image or ask a question...")
+
+            with gr.Row():
+                compute_gradients = gr.Checkbox(value=False, label="Compute gradient attributions")
+                run_faithfulness = gr.Checkbox(value=False, label="Run faithfulness diagnostics")
+                run_mechanistic_suite = gr.Checkbox(value=False, label="Run mechanistic suite (4 probes)")
+
+            with gr.Accordion("Advanced Mechanistic Probes Options", open=False):
+                with gr.Row():
+                    mech_layer_index = gr.Number(value=12, precision=0, label="Patch Layer Index")
+                    mech_top_k = gr.Number(value=20, precision=0, label="Top-K (logit lens/grounding)")
+                    mech_mask_fraction = gr.Slider(
+                        minimum=0.0,
+                        maximum=1.0,
+                        value=0.3,
+                        step=0.05,
+                        label="Mask Fraction (patch/grounding)",
+                    )
+                    mech_visual_only = gr.Checkbox(value=True, label="Visual-only patching when supported")
+
+                with gr.Row():
+                    mech_patterns = gr.Textbox(
+                        label="Layer Patterns (regex; comma/newline separated)",
+                        lines=2,
+                        placeholder="language_model\\.model\\.layers, vision_model\\.encoder\\.layers",
+                    )
+                    mech_positions = gr.Textbox(label="Logit Lens Positions", value="-1")
+                    mech_max_tokens = gr.Number(value=256, precision=0, label="Cache Max Tokens")
+                    mech_max_layers = gr.Number(value=0, precision=0, label="Logit Lens Max Layers (0 = all)")
 
             run_btn = gr.Button("Analyze", variant="primary")
 
@@ -833,26 +866,30 @@ def build_app() -> gr.Blocks:
 
         with gr.Tab("Compare"):
             with gr.Row():
+                c_model = gr.Textbox(value=DEFAULT_MODELS["auto"], label="Model Checkpoint", scale=3)
                 c_family = gr.Dropdown(
                     choices=SUPPORTED_FAMILIES,
                     value="auto",
                     label="Model Family",
                     allow_custom_value=True,
+                    scale=1,
                 )
-                c_model = gr.Textbox(value=DEFAULT_MODELS["auto"], label="Model Checkpoint")
-                c_device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
-                c_dtype = gr.Dropdown(
-                    choices=["float16", "bfloat16", "float32"],
-                    value="float16",
-                    label="Precision",
-                )
-                c_trust_remote_code = gr.Checkbox(value=False, label="trust_remote_code")
+
+            with gr.Accordion("Runtime Settings", open=False):
+                with gr.Row():
+                    c_device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
+                    c_dtype = gr.Dropdown(
+                        choices=["float16", "bfloat16", "float32"],
+                        value="float16",
+                        label="Precision",
+                    )
+                    c_trust_remote_code = gr.Checkbox(value=False, label="trust_remote_code")
 
             c_image = gr.Image(type="pil", label="Input Image")
             with gr.Row():
                 prompt_a = gr.Textbox(label="Prompt A", lines=3)
                 prompt_b = gr.Textbox(label="Prompt B", lines=3)
-            c_run = gr.Button("Compare", variant="primary")
+            c_run = gr.Button("Compare Prompts", variant="primary")
 
             compare_table = gr.Dataframe(label="Comparison Summary", interactive=False)
             with gr.Row():
@@ -882,28 +919,41 @@ def build_app() -> gr.Blocks:
 
         with gr.Tab("Eval"):
             with gr.Row():
+                e_model = gr.Textbox(value=DEFAULT_MODELS["auto"], label="Model Checkpoint", scale=3)
                 e_family = gr.Dropdown(
                     choices=SUPPORTED_FAMILIES,
                     value="auto",
                     label="Model Family",
                     allow_custom_value=True,
-                )
-                e_model = gr.Textbox(value=DEFAULT_MODELS["auto"], label="Model Checkpoint")
-                e_device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
-                e_dtype = gr.Dropdown(
-                    choices=["float16", "bfloat16", "float32"],
-                    value="float16",
-                    label="Precision",
+                    scale=1,
                 )
 
-            dataset_path = gr.Textbox(
-                label="Dataset JSONL Path",
-                placeholder="/absolute/path/to/dataset.jsonl",
-            )
+            with gr.Accordion("Runtime Settings", open=False):
+                with gr.Row():
+                    e_device = gr.Dropdown(choices=["auto", "cpu", "cuda", "mps"], value="auto", label="Device")
+                    e_dtype = gr.Dropdown(
+                        choices=["float16", "bfloat16", "float32"],
+                        value="float16",
+                        label="Precision",
+                    )
+                    e_trust = gr.Checkbox(value=False, label="trust_remote_code")
+
             with gr.Row():
-                e_trust = gr.Checkbox(value=False, label="trust_remote_code")
+                dataset_path = gr.Textbox(
+                    label="Dataset JSONL Path",
+                    placeholder="/absolute/path/to/dataset.jsonl",
+                    scale=2,
+                )
+                dataset_file = gr.File(
+                    label="Upload Dataset JSONL File",
+                    file_types=[".jsonl"],
+                    scale=2,
+                )
+
+            with gr.Row():
                 e_grad = gr.Checkbox(value=False, label="Compute gradients")
                 e_faith = gr.Checkbox(value=False, label="Run faithfulness")
+
             e_run = gr.Button("Run Eval", variant="primary")
 
             eval_df = gr.Dataframe(label="Evaluation Results", interactive=False)
@@ -915,6 +965,7 @@ def build_app() -> gr.Blocks:
                 run_eval,
                 inputs=[
                     dataset_path,
+                    dataset_file,
                     e_family,
                     e_model,
                     e_device,

@@ -12,14 +12,23 @@ import torch
 LAYER_INDEX_PARENTS = {"layers", "layer", "h", "blocks", "block"}
 
 
+KNOWN_SUBMODULE_SUFFIXES = {
+    "q_proj", "k_proj", "v_proj", "o_proj",
+    "gate_proj", "up_proj", "down_proj", "act_fn",
+    "self_attn", "mlp", "post_attention_layernorm", "input_layernorm",
+    "multi_modal_projector", "projector", "visual_projection", "text_projection",
+}
+
+
 def discover_transformer_layers(
     model: torch.nn.Module,
     include_patterns: Iterable[str] | None = None,
+    include_submodules: bool = True,
 ) -> list[str]:
-    """Discover hookable transformer block paths by module name shape.
+    """Discover hookable transformer block paths and fine-grained submodules.
 
-    A layer is considered hookable when its module path ends with an integer index
-    under a common transformer container, e.g. ``encoder.layers.5``.
+    Discovers main layer blocks (e.g. ``encoder.layers.5``) as well as internal
+    submodules (e.g. ``encoder.layers.5.self_attn.q_proj``, ``mlp``, ``projector``).
     """
     include_regex = [re.compile(p) for p in include_patterns or []]
 
@@ -30,10 +39,23 @@ def discover_transformer_layers(
         segments = name.split(".")
         if len(segments) < 2:
             continue
-        if not segments[-1].isdigit() or segments[-2] not in LAYER_INDEX_PARENTS:
+
+        is_main_layer = segments[-1].isdigit() and segments[-2] in LAYER_INDEX_PARENTS
+        is_submodule = (
+            include_submodules
+            and len(segments) >= 3
+            and (
+                segments[-1] in KNOWN_SUBMODULE_SUFFIXES
+                or any(seg.isdigit() for seg in segments[:-1])
+            )
+        )
+
+        if not (is_main_layer or is_submodule):
             continue
+
         if include_regex and not any(r.search(name) for r in include_regex):
             continue
+
         layer_names.append(name)
     return layer_names
 

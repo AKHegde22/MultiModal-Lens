@@ -30,19 +30,31 @@ def test_alias_resolves_to_blip2_adapter() -> None:
 
 def test_alias_resolves_to_llava_adapter() -> None:
     adapter = registry.create_adapter(
-        family="qwen2_vl",
-        model_name="dummy/qwen2-vl",
+        family="llava_next",
+        model_name="dummy/llava-next",
         device="cpu",
         dtype="float32",
     )
     assert isinstance(adapter, LlavaAdapter)
 
 
+def test_alias_resolves_to_generic_adapter() -> None:
+    from multimodallens.adapters.generic_adapter import GenericVLMAdapter
+
+    adapter = registry.create_adapter(
+        family="qwen2_vl",
+        model_name="dummy/qwen2-vl",
+        device="cpu",
+        dtype="float32",
+    )
+    assert isinstance(adapter, GenericVLMAdapter)
+
+
 def test_auto_family_uses_model_type_inference(monkeypatch) -> None:
     monkeypatch.setattr(
         registry.AutoConfig,
         "from_pretrained",
-        lambda *args, **kwargs: SimpleNamespace(model_type="qwen2_vl", architectures=[]),
+        lambda *args, **kwargs: SimpleNamespace(model_type="llava", architectures=[]),
     )
 
     adapter = registry.create_adapter(
@@ -52,6 +64,7 @@ def test_auto_family_uses_model_type_inference(monkeypatch) -> None:
         dtype="float32",
     )
     assert isinstance(adapter, LlavaAdapter)
+
 
 
 def test_unknown_family_uses_config_inference(monkeypatch) -> None:

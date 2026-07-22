@@ -212,7 +212,10 @@ class LlavaAdapter(ModelAdapter):
         vis_cfg = getattr(self.model.config, "vision_config", None)
         if vis_cfg is None:
             return 256
-        image_size = int(getattr(vis_cfg, "image_size", 336))
+        raw_size = getattr(vis_cfg, "image_size", 336)
+        if isinstance(raw_size, (list, tuple)):
+            raw_size = raw_size[0]
+        image_size = int(raw_size)
         patch = int(getattr(vis_cfg, "patch_size", 14))
         return max(1, (image_size // patch) ** 2)
 
@@ -283,20 +286,21 @@ class LlavaAdapter(ModelAdapter):
             objective = outputs.logits[0, -1].max()
             objective.backward()
 
-            grads = hidden_last.grad[0]
-            if image_seq_indices:
-                clipped = [i for i in image_seq_indices if i < grads.shape[0]]
-                if clipped:
-                    grad_vec = grads[clipped].norm(dim=-1)
+            if hidden_last.grad is not None:
+                grads = hidden_last.grad[0]
+                if image_seq_indices:
+                    clipped = [i for i in image_seq_indices if i < grads.shape[0]]
+                    if clipped:
+                        grad_vec = grads[clipped].norm(dim=-1)
+                    else:
+                        grad_vec = image_hidden.norm(dim=-1)
                 else:
                     grad_vec = image_hidden.norm(dim=-1)
-            else:
-                grad_vec = image_hidden.norm(dim=-1)
 
-            if grad_vec.shape[0] != num_patches:
-                grad_vec = image_hidden.norm(dim=-1)
-            grad_map = vector_to_patch_grid(grad_vec, patch_grid)
-            attention_maps["vision_grad"] = grad_map
+                if grad_vec.shape[0] != num_patches:
+                    grad_vec = image_hidden.norm(dim=-1)
+                grad_map = vector_to_patch_grid(grad_vec, patch_grid)
+                attention_maps["vision_grad"] = grad_map
 
         if len(text_tokens) > text_hidden.shape[0]:
             text_tokens = text_tokens[-text_hidden.shape[0] :]

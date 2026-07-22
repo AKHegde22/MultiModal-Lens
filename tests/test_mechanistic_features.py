@@ -195,12 +195,13 @@ def test_hook_layer_discovery_and_capture():
     image = _make_image(0)
 
     layers = list_hookable_layers(adapter)
-    assert len(layers) == 4
-    assert layers[0].startswith("layers.")
+    assert len(layers) >= 4
+    assert any("layers.0" in l for l in layers)
 
     run = capture_layer_activations(adapter=adapter, image=image, prompt="hello world")
-    assert len(run.layers) == 4
+    assert len(run.layers) >= 4
     assert run.layers[0].values.ndim == 3
+
 
 
 def test_cross_modal_activation_patch_changes_score():

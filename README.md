@@ -1,162 +1,128 @@
-# MultimodalLens
+# MultimodalLens 🔍
 
-MultimodalLens is a publishing-ready multimodal interpretability toolkit for Hugging Face vision-language models. It combines interactive debugging with mechanistic probes and release-grade evaluation workflows.
+*A library for mechanistic interpretability of vision-language models.* Inspired by [TransformerLens](https://github.com/TransformerLensOrg/TransformerLens).
 
-## Project Status
+[![PyPI version](https://img.shields.io/pypi/v/multimodallens.svg)](https://pypi.org/project/multimodallens/)
+[![Build Status](https://github.com/AKHegde22/Papers-C/actions/workflows/ci.yml/badge.svg)](https://github.com/AKHegde22/Papers-C/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
-- Stage: Beta
-- Primary interface: Gradio app (`Explore`, `Compare`, `Eval`)
-- Mechanistic focus: TransformerLens-inspired workflows for multimodal models
-- Publishing support: preflight checks, tested-model matrix, CI and release build verification
+MultimodalLens lets you inspect internal activations, attention rollouts, token-patch alignments, logit lens predictions, and grounding circuits across 20+ Hugging Face vision-language model architecture families.
 
-## Core Capabilities
-
-- Attention analysis (rollout, optional gradients, overlays)
-- Token-patch alignment and token contribution scoring
-- Cross-modal similarity diagnostics
-- Faithfulness diagnostics (deletion/insertion/counterfactual/attn-grad agreement)
-- Layer activation caching with forward hooks
-- Cross-modal activation patching
-- Multimodal logit lens decoding
-- Grounding-head discovery via visual ablation sensitivity
-
-## Supported Family Labels
-
-Recommended input is `auto`, which resolves to canonical adapters from model config.
-
-- CLIP family: `clip`, `siglip`, `siglip2`, `altclip`, `xclip`
-- BLIP family: `blip2`, `instructblip`
-- Decoder VLM family: `llava`, `llava_next`, `llava_onevision`, `qwen2_vl`, `qwen2_5_vl`, `idefics2`, `idefics3`, `paligemma`, `mllama`, `internvl`, `minicpmv`, `smolvlm`, `kosmos2`, `florence2`
-
-Custom family labels are also accepted; the registry will infer a canonical adapter path.
+---
 
 ## Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
+pip install multimodallens
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/AKHegde22/Papers-C.git
+cd MultiModal-Lens
 pip install -e .
 ```
 
-Optional extras:
-
-```bash
-pip install -e '.[dev]'
-pip install -e '.[publish]'
-```
-
-## Run The App
-
-```bash
-python app.py
-```
-
-Then open the local Gradio URL.
+---
 
 ## Quick Start
 
-1. Open `Explore`.
-2. Set `Model Family` to `auto`.
-3. Enter a model checkpoint (or keep default).
-4. Upload image + prompt.
-5. Click `Analyze`.
-6. Optional: enable `Run mechanistic suite (4 probes)`.
+### 1. Power API (`HookedVLM`)
 
-## CLI Workflows
+```python
+from multimodallens import HookedVLM
+from PIL import Image
 
-### Batch evaluation
+# Load model in 1 line
+vlm = HookedVLM.from_pretrained("openai/clip-vit-base-patch32", device="auto")
+
+# Run with cache — get logits, scores, and all internal layer activations
+result, cache = vlm.run_with_cache(Image.open("cat.jpg"), "a photo of a cat")
+
+# Access activation by layer name
+layer_5_act = cache["vision_encoder.layers.5"]
+```
+
+### 2. Intervention Hooks (`run_with_hooks`)
+
+```python
+# Zero-ablate a layer on the fly
+def zero_ablate(tensor):
+    return tensor * 0.0
+
+patched_result = vlm.run_with_hooks(
+    image=Image.open("cat.jpg"),
+    prompt="a photo of a cat",
+    fwd_hooks=[("vision_encoder.layers.5", zero_ablate)]
+)
+```
+
+### 3. Launch Interactive Web App
 
 ```bash
-python scripts/run_eval.py \
-  --dataset /absolute/path/dataset.jsonl \
-  --family auto \
-  --model openai/clip-vit-base-patch32 \
-  --output eval_results.csv
+multimodallens ui
 ```
 
-### Mechanistic probes
+---
+
+## Core Capabilities
+
+- **`HookedVLM` & `ActivationCache`**: TransformerLens-style stateful interface with dict-like activation lookup.
+- **Attention Rollout & Overlays**: Heatmap generation over input images from multi-head attention weights.
+- **Token-Patch Alignment**: Cross-modal cosine similarity matrices between text tokens and visual patches.
+- **Multimodal Logit Lens**: Decode intermediate hidden states to vocabulary tokens layer by layer.
+- **Cross-Modal Activation Patching**: Causal tracing by swapping activations between source and target images.
+- **Grounding Head Discovery**: Identify specific attention heads responsible for visual grounding.
+- **Faithfulness Diagnostics**: Deletion/insertion curves and counterfactual perturbation drops.
+
+---
+
+## Demo Notebooks & Tutorials
+
+| Notebook | Description | Link |
+|---|---|---|
+| **Main Demo** | Full overview of all library features | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](Main_Demo.ipynb) |
+| `01_quickstart` | 5-minute introduction to `HookedVLM` | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](demos/01_quickstart.ipynb) |
+| `02_attention_deep_dive` | Attention rollout, alignment & gradients | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](demos/02_attention_deep_dive.ipynb) |
+| `03_mechanistic_probes` | Logit lens, patching & grounding heads | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](demos/03_mechanistic_probes.ipynb) |
+| `04_faithfulness_testing` | Perturbation curves & Spearman rank tests | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](demos/04_faithfulness_testing.ipynb) |
+| `05_comparing_models` | Differential prompt & model comparisons | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](demos/05_comparing_models.ipynb) |
+
+---
+
+## Supported Model Families
+
+| Family Label | Canonical Adapter | Example Checkpoints | Status |
+|---|---|---|---|
+| `auto` | Automatic Inference | *Infers family from HF AutoConfig* | ✅ Supported |
+| `clip` | `CLIPAdapter` | `openai/clip-vit-base-patch32`, `google/siglip-base-patch16-224` | ✅ Supported |
+| `blip2` | `BLIP2Adapter` | `Salesforce/blip2-opt-2.7b`, `Salesforce/instructblip-vicuna-7b` | ✅ Supported |
+| `llava` | `LlavaAdapter` | `llava-hf/llava-1.5-7b-hf`, `Qwen/Qwen2-VL-2B-Instruct`, `HuggingFaceM4/idefics2-8b` | ✅ Supported |
+
+Other supported aliases: `siglip`, `siglip2`, `altclip`, `xclip`, `instructblip`, `llava_next`, `llava_onevision`, `qwen2_vl`, `qwen2_5_vl`, `idefics2`, `idefics3`, `paligemma`, `mllama`, `internvl`, `minicpmv`, `smolvlm`, `kosmos2`, `florence2`.
+
+---
+
+## CLI Usage
 
 ```bash
-python scripts/run_mechanistic.py grounding \
-  --family auto \
-  --model llava-hf/llava-1.5-7b-hf \
-  --image /abs/path/image.jpg \
-  --prompt "Describe this scene" \
-  --output outputs/grounding.json
+# Launch UI
+multimodallens ui --port 7860
+
+# Run single analysis
+multimodallens analyze --model openai/clip-vit-base-patch32 --image photo.jpg --prompt "a dog"
+
+# Model compatibility preflight
+multimodallens preflight --model Qwen/Qwen2-VL-2B-Instruct
+
+# Batch evaluation
+multimodallens eval --dataset dataset.jsonl --model openai/clip-vit-base-patch32 --output results.csv
 ```
 
-Modes: `layers`, `cache`, `patch`, `logit-lens`, `grounding`.
+---
 
-### Model preflight
+## License
 
-```bash
-python scripts/run_preflight.py \
-  --family auto \
-  --model openai/clip-vit-base-patch32
-```
-
-Optional JSON report:
-
-```bash
-python scripts/run_preflight.py \
-  --family auto \
-  --model Qwen/Qwen2-VL-2B-Instruct \
-  --output reports/preflight_qwen2_vl.json
-```
-
-## Dataset Format
-
-For `run_eval.py`, each JSONL row must include:
-
-```json
-{"id": "sample-1", "image": "/abs/path/image.jpg", "text": "a red bus on a city street"}
-```
-
-## Repository Layout
-
-```text
-src/multimodallens/
-  adapters/      # Family-specific model adapters
-  analysis/      # Attribution and mechanistic analysis
-  core/          # Registry, pipeline, preflight
-  eval/          # Batch evaluation runner
-  ui/            # Gradio UI
-  utils/         # Tensor/image helpers
-  viz/           # Plot builders
-scripts/         # CLI utilities
-docs/            # Methodology and release documentation
-tests/           # Unit and integration-style tests
-```
-
-## Documentation
-
-- docs/README.md
-- docs/methodology.md
-- docs/research_paper_draft.md
-- docs/publishing_checklist.md
-- docs/tested_model_matrix.md
-
-## Publish Checklist
-
-Before tagging:
-
-1. `ruff check src scripts tests`
-2. `pytest -q`
-3. `python -m build`
-4. `twine check dist/*`
-5. Update `docs/tested_model_matrix.md`
-
-## Notes
-
-- Large checkpoints can require significant memory.
-- Use `trust_remote_code=True` only for trusted repositories.
-- Attention is a diagnostic signal, not a standalone causal proof.
-
-## Next Steps (TODO)
-
-- [ ] Add automated smoke tests against a pinned public checkpoint set per family alias group.
-- [ ] Add reproducible benchmark scripts for grounding and hallucination analysis.
-- [ ] Add optional notebook exports from Explore artifacts.
-- [ ] Add adapter-level telemetry for runtime fallback decisions.
-- [ ] Add a versioned changelog process for releases.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.

@@ -11,6 +11,13 @@ from multimodallens.adapters.llava_adapter import LlavaAdapter
 from transformers import AutoConfig
 
 
+from multimodallens.exceptions import UnsupportedFamilyError
+
+
+from multimodallens.adapters.generic_adapter import GenericVLMAdapter
+from multimodallens.core.config_schema import BUILTIN_CONFIGS
+
+
 CANONICAL_ADAPTERS: dict[str, type[ModelAdapter]] = {
     "clip": CLIPAdapter,
     "blip2": BLIP2Adapter,
@@ -37,11 +44,12 @@ FAMILY_ALIASES: dict[str, str] = {
     "llava_next": "llava",
     "llava_onevision": "llava",
     "llava_next_video": "llava",
-    "qwen2_vl": "llava",
-    "qwen2_5_vl": "llava",
-    "idefics2": "llava",
-    "idefics3": "llava",
-    "paligemma": "llava",
+    "qwen2_vl": "qwen2_vl",
+    "qwen2_5_vl": "qwen2_vl",
+    "pixtral": "pixtral",
+    "idefics2": "idefics3",
+    "idefics3": "idefics3",
+    "paligemma": "paligemma",
     "mllama": "llava",
     "internvl": "llava",
     "minicpmv": "llava",
@@ -72,6 +80,7 @@ SUPPORTED_FAMILIES: list[str] = [
     "llava_onevision",
     "qwen2_vl",
     "qwen2_5_vl",
+    "pixtral",
     "idefics2",
     "idefics3",
     "paligemma",
@@ -84,12 +93,12 @@ SUPPORTED_FAMILIES: list[str] = [
 ]
 
 
-def infer_family_from_model(model_name: str, trust_remote_code: bool = False) -> str:
+def infer_family_from_model(model_name: str, trust_remote_code: bool = False) -> str | None:
     """Infer canonical family from Hugging Face model config."""
     try:
         cfg = AutoConfig.from_pretrained(model_name, trust_remote_code=trust_remote_code)
     except Exception:
-        return "llava"
+        return None
 
     model_type = _normalize_family_name(str(getattr(cfg, "model_type", "")))
     mapped = MODEL_TYPE_TO_CANONICAL.get(model_type)
@@ -117,25 +126,35 @@ def infer_family_from_model(model_name: str, trust_remote_code: bool = False) ->
     if any(hint in arch_text for hint in llava_hints):
         return "llava"
 
-    return "llava"
+    return None
 
 
 def resolve_family(family: str, model_name: str, trust_remote_code: bool = False) -> str:
     """Resolve user family label to canonical adapter family."""
     key = _normalize_family_name(family)
+    supported_str = ", ".join(SUPPORTED_FAMILIES)
+
     if key == "auto":
-        return infer_family_from_model(model_name=model_name, trust_remote_code=trust_remote_code)
+        inferred = infer_family_from_model(model_name=model_name, trust_remote_code=trust_remote_code)
+        if inferred:
+            return inferred
+        raise UnsupportedFamilyError(
+            f"Could not automatically infer model family for '{model_name}'. "
+            f"Supported families: {supported_str}"
+        )
 
     mapped = FAMILY_ALIASES.get(key)
     if mapped is not None:
         return mapped
 
     inferred = infer_family_from_model(model_name=model_name, trust_remote_code=trust_remote_code)
-    if inferred in CANONICAL_ADAPTERS:
+    if inferred:
         return inferred
 
-    supported = ", ".join(SUPPORTED_FAMILIES)
-    raise ValueError(f"Unsupported model family '{family}'. Supported: {supported}")
+    if key in BUILTIN_CONFIGS:
+        return key
+
+    raise UnsupportedFamilyError(f"Unsupported model family '{family}'. Supported families: {supported_str}")
 
 
 def create_adapter(
@@ -152,11 +171,22 @@ def create_adapter(
         model_name=model_name,
         trust_remote_code=trust_remote_code,
     )
-    cls = CANONICAL_ADAPTERS[key]
-    return cls(
+    cls = CANONICAL_ADAPTERS.get(key)
+    if cls is not None:
+        return cls(
+            model_name=model_name,
+            device=device,
+            dtype=dtype,
+            trust_remote_code=trust_remote_code,
+            low_cpu_mem_usage=low_cpu_mem_usage,
+        )
+
+    return GenericVLMAdapter(
+        family=key,
         model_name=model_name,
         device=device,
         dtype=dtype,
         trust_remote_code=trust_remote_code,
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
+

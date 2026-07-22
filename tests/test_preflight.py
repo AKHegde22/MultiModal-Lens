@@ -23,10 +23,11 @@ def test_preflight_resolves_auto_family_with_vision_config(monkeypatch) -> None:
         trust_remote_code=False,
     )
 
-    assert report.resolved_family == "llava"
+    assert report.resolved_family == "qwen2_vl"
     assert report.has_vision_tower
     assert report.supports_explore
     assert not report.errors
+
 
 
 def test_preflight_warns_for_non_multimodal_config(monkeypatch) -> None:

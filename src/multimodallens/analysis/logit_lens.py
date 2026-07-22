@@ -223,3 +223,22 @@ def run_multimodal_logit_lens(
         prompt=prompt,
         steps=steps,
     )
+
+
+def run_vision_logit_lens(
+    adapter: ModelAdapter,
+    image: Image.Image,
+    layer_names: list[str] | None = None,
+    top_k: int = 5,
+) -> LogitLensResult:
+    """Decode vision encoder patch representations into text vocabulary space."""
+    patterns = [r"vision", r"visual", r"encoder"]
+    return run_multimodal_logit_lens(
+        adapter=adapter,
+        image=image,
+        prompt="[VISION_LOGIT_LENS]",
+        layer_names=layer_names,
+        include_patterns=patterns,
+        positions=[0, -1],
+        top_k=top_k,
+    )

@@ -77,13 +77,18 @@ def run_model_preflight(
     trust_remote_code: bool = False,
 ) -> ModelPreflightReport:
     """Run a lightweight config-based compatibility check for selected model/family."""
-    report = ModelPreflightReport(
-        requested_family=family,
-        resolved_family=resolve_family(
+    try:
+        resolved_family = resolve_family(
             family=family,
             model_name=model_name,
             trust_remote_code=trust_remote_code,
-        ),
+        )
+    except Exception:
+        resolved_family = "unknown"
+
+    report = ModelPreflightReport(
+        requested_family=family,
+        resolved_family=resolved_family,
         model_name=model_name,
         model_type=None,
     )

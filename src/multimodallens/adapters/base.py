@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
 from PIL import Image
 
+from multimodallens.exceptions import UnsupportedDtypeError
 from multimodallens.types import AnalysisResult, AdapterBatch
 
 
@@ -44,8 +46,23 @@ class ModelAdapter(ABC):
     ) -> None:
         self.model_name = model_name
         self.device = resolve_device(device)
+
+        if dtype not in DTYPE_MAP:
+            supported = ", ".join(DTYPE_MAP.keys())
+            raise UnsupportedDtypeError(f"Unsupported dtype '{dtype}'. Supported dtypes: {supported}")
+
         self.dtype_name = dtype
-        self.torch_dtype = DTYPE_MAP.get(dtype, torch.float16)
+        self.torch_dtype = DTYPE_MAP[dtype]
+
+        if self.device.type == "cpu" and self.dtype_name in ("float16", "bfloat16"):
+            warnings.warn(
+                f"Dtype '{dtype}' on CPU can cause instability or crashes. Promoting precision to float32 for CPU execution.",
+                UserWarning,
+                stacklevel=2,
+            )
+            self.dtype_name = "float32"
+            self.torch_dtype = torch.float32
+
         self.trust_remote_code = trust_remote_code
         self.low_cpu_mem_usage = low_cpu_mem_usage
 

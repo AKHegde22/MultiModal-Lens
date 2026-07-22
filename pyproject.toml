@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multimodallens"
-version = "0.1.0"
+version = "0.2.0"
 description = "Interactive visualization and debugging toolkit for Hugging Face multimodal models"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,9 @@ dependencies = [
   "safetensors>=0.4.0"
 ]
 
+[project.scripts]
+multimodallens = "multimodallens.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/AKHegde22/Papers-C"
 Repository = "https://github.com/AKHegde22/Papers-C"
@@ -60,6 +63,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+multimodallens = ["data/*.json"]
 
 [tool.ruff]
 line-length = 100

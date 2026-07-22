@@ -1,0 +1,52 @@
+{
+  "clip": {
+    "canonical_adapter": "CLIPAdapter",
+    "aliases": ["clip", "siglip", "siglip2", "altclip", "xclip", "chinese_clip"],
+    "default_checkpoint": "openai/clip-vit-base-patch32",
+    "tested_checkpoints": [
+      "openai/clip-vit-base-patch32",
+      "google/siglip-base-patch16-224"
+    ],
+    "status": "pass",
+    "notes": "Dual encoder visual-text alignment and feature mapping."
+  },
+  "blip2": {
+    "canonical_adapter": "BLIP2Adapter",
+    "aliases": ["blip2", "blip_2", "instructblip", "instruct_blip"],
+    "default_checkpoint": "Salesforce/blip2-opt-2.7b",
+    "tested_checkpoints": [
+      "Salesforce/blip2-opt-2.7b"
+    ],
+    "status": "partial",
+    "notes": "Q-Former + language decoder stack."
+  },
+  "llava": {
+    "canonical_adapter": "LlavaAdapter",
+    "aliases": [
+      "llava",
+      "llava_next",
+      "llava_onevision",
+      "llava_next_video",
+      "qwen2_vl",
+      "qwen2_5_vl",
+      "idefics2",
+      "idefics3",
+      "paligemma",
+      "mllama",
+      "internvl",
+      "minicpmv",
+      "minicpmo",
+      "smolvlm",
+      "kosmos2",
+      "florence2"
+    ],
+    "default_checkpoint": "llava-hf/llava-1.5-7b-hf",
+    "tested_checkpoints": [
+      "llava-hf/llava-1.5-7b-hf",
+      "Qwen/Qwen2-VL-2B-Instruct",
+      "HuggingFaceM4/idefics2-8b"
+    ],
+    "status": "partial",
+    "notes": "Interleaved decoder VLMs with visual token sequence segmentation."
+  }
+}

@@ -26,19 +26,19 @@ class LensPipeline:
     """Stateful adapter manager + analysis entry points."""
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, str, str, str], object] = {}
+        self._cache: dict[tuple[str, str, str, str, bool, bool], object] = {}
 
     def get_adapter(
         self,
-        family: str,
-        model_name: str,
+        family: str = "auto",
+        model_name: str = "openai/clip-vit-base-patch32",
         device: str = "auto",
         dtype: str = "float16",
         trust_remote_code: bool = False,
         low_cpu_mem_usage: bool = True,
     ):
         """Get cached adapter or construct a new one."""
-        key = (family, model_name, device, dtype)
+        key = (family, model_name, device, dtype, trust_remote_code, low_cpu_mem_usage)
         if key not in self._cache:
             self._cache[key] = create_adapter(
                 family=family,
@@ -226,13 +226,14 @@ class LensPipeline:
 
     def logit_lens(
         self,
-        family: str,
         model_name: str,
         image: Image.Image,
         prompt: str,
+        family: str = "auto",
         device: str = "auto",
         dtype: str = "float16",
         trust_remote_code: bool = False,
+
         layer_names: list[str] | None = None,
         include_patterns: list[str] | None = None,
         positions: list[int] | None = None,
