@@ -3,526 +3,506 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MultiModal-Lens — Looking Inside Vision-Language Models</title>
+<title>MultiModal-Lens: Looking Inside Vision-Language Models</title>
 <meta name="description" content="A mechanistic interpretability toolkit for vision-language models. Inspect attention, alignment, and causal circuits across 20+ VLM architectures.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0a0e17;--bg-card:#111827;--bg-card-hover:#1a2332;
-  --surface:#161e2e;--surface-raised:#1e293b;
-  --border:#1e293b;--border-bright:#334155;
-  --text:#e2e8f0;--text-muted:#94a3b8;--text-dim:#64748b;
-  --accent:#06d6a0;--accent-dim:#06d6a033;--accent-glow:#06d6a018;
-  --accent2:#f59e0b;--accent2-dim:#f59e0b33;
-  --accent3:#8b5cf6;--accent3-dim:#8b5cf633;
-  --accent4:#ec4899;--accent4-dim:#ec489933;
-  --red:#ef4444;--red-dim:#ef444433;
-  --cyan:#22d3ee;--cyan-dim:#22d3ee22;
-  --font-display:'Instrument Serif',Georgia,serif;
+  --bg:#0b1120;--surface:#111a2e;--surface-raised:#182240;
+  --border:#1c2a4a;--border-bright:#2d4270;
+  --text:#e0e7f1;--text-muted:#8da0c0;--text-dim:#6b82a8;
+  --accent:#34d399;--accent-soft:#34d39915;--accent-mid:#34d39930;
+  --warm:#f0a858;--warm-soft:#f0a85818;
+  --violet:#a78bfa;--violet-soft:#a78bfa18;
+  --rose:#f472b6;--rose-soft:#f472b618;
+  --font-display:'Fraunces',Georgia,serif;
   --font-body:'Inter',system-ui,sans-serif;
   --font-mono:'JetBrains Mono',monospace;
-  --max-w:1200px;--reading-w:72ch;
 }
-html{scroll-behavior:smooth;font-size:16px}
-body{
-  font-family:var(--font-body);color:var(--text);
-  background:var(--bg);line-height:1.7;
-  -webkit-font-smoothing:antialiased;overflow-x:hidden;
-}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);color:var(--text);background:var(--bg);line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 ::selection{background:var(--accent);color:var(--bg)}
 
-/* --- Scrollbar --- */
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:3px}
+/* Focus states — WCAG 2.1 */
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+a:focus-visible{outline-offset:4px}
+button:focus-visible{outline-offset:2px}
 
-/* --- Nav --- */
+/* Skip to content */
+.skip-link{
+  position:absolute;top:-100%;left:1rem;z-index:999;
+  padding:.75rem 1.25rem;background:var(--accent);color:var(--bg);
+  font-weight:600;font-size:.85rem;border-radius:0 0 6px 6px;
+  text-decoration:none;transition:top .2s;
+}
+.skip-link:focus{top:0}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Nav */
 nav{
   position:fixed;top:0;left:0;right:0;z-index:100;
   padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;
-  background:rgba(10,14,23,0.85);backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border);transition:all .3s;
+  background:rgba(11,17,32,0.92);border-bottom:1px solid var(--border);
+  transition:padding .3s;
 }
-nav.scrolled{padding:.75rem 2rem;background:rgba(10,14,23,0.95)}
-.nav-logo{
-  font-family:var(--font-display);font-size:1.35rem;color:var(--text);
-  text-decoration:none;display:flex;align-items:center;gap:.6rem;
-}
-.nav-logo .lens{
-  width:28px;height:28px;border:2px solid var(--accent);border-radius:50%;
-  position:relative;display:inline-flex;align-items:center;justify-content:center;
-}
-.nav-logo .lens::after{
-  content:'';width:10px;height:10px;background:var(--accent);border-radius:50%;
-  opacity:.6;
-}
-.nav-links{display:flex;gap:2rem;list-style:none}
-.nav-links a{
-  color:var(--text-muted);text-decoration:none;font-size:.85rem;
-  font-weight:500;letter-spacing:.02em;transition:color .2s;
-}
+nav.scrolled{padding:.65rem 2rem}
+.nav-logo{font-family:var(--font-display);font-size:1.2rem;color:var(--text);text-decoration:none;display:flex;align-items:center;gap:.55rem;font-weight:500}
+.nav-logo .lens{width:24px;height:24px;border:2px solid var(--accent);border-radius:50%;position:relative;display:inline-flex;align-items:center;justify-content:center}
+.nav-logo .lens::after{content:'';width:8px;height:8px;background:var(--accent);border-radius:50%;opacity:.5}
+.nav-links{display:flex;gap:1.75rem;list-style:none}
+.nav-links a{color:var(--text-muted);text-decoration:none;font-size:.82rem;font-weight:500;transition:color .2s}
 .nav-links a:hover{color:var(--accent)}
-.nav-cta{
-  background:var(--accent);color:var(--bg);padding:.5rem 1.25rem;
-  border-radius:6px;font-size:.8rem;font-weight:600;text-decoration:none;
-  letter-spacing:.02em;transition:all .2s;
-}
-.nav-cta:hover{filter:brightness(1.15);transform:translateY(-1px)}
+.nav-cta{background:var(--accent);color:var(--bg);padding:.45rem 1.1rem;border-radius:5px;font-size:.78rem;font-weight:600;text-decoration:none;transition:all .2s}
+.nav-cta:hover{filter:brightness(1.1)}
 
-/* --- Hero --- */
+/* Hamburger */
+.hamburger{display:none;background:none;border:none;cursor:pointer;padding:.5rem;z-index:101}
+.hamburger span{display:block;width:20px;height:2px;background:var(--text);margin:4px 0;transition:all .3s;border-radius:1px}
+.hamburger.open span:nth-child(1){transform:rotate(45deg) translate(4px,4px)}
+.hamburger.open span:nth-child(2){opacity:0}
+.hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(4px,-4px)}
+.mobile-menu{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:var(--bg);z-index:99;padding:5rem 2rem 2rem;
+  flex-direction:column;gap:1.5rem;
+}
+.mobile-menu.open{display:flex}
+.mobile-menu a{color:var(--text);text-decoration:none;font-size:1.1rem;font-weight:500;padding:.5rem 0;border-bottom:1px solid var(--border)}
+
+/* Hero — Origin story leads */
 .hero{
   min-height:100vh;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;text-align:center;
-  padding:8rem 2rem 6rem;position:relative;overflow:hidden;
+  justify-content:center;padding:7rem 2rem 5rem;position:relative;
+  max-width:1100px;margin:0 auto;
 }
-.hero::before{
-  content:'';position:absolute;inset:0;
-  background:
-    radial-gradient(ellipse 800px 600px at 50% 40%,var(--accent-glow),transparent),
-    radial-gradient(ellipse 400px 400px at 70% 60%,var(--accent3-dim),transparent);
+.hero-kicker{
+  font-family:var(--font-mono);font-size:.7rem;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:500;margin-bottom:1rem;
 }
-.hero-badge{
-  display:inline-flex;align-items:center;gap:.5rem;
-  padding:.4rem 1rem;border-radius:100px;
-  border:1px solid var(--border-bright);background:var(--surface);
-  font-size:.78rem;color:var(--text-muted);font-weight:500;
-  margin-bottom:2rem;letter-spacing:.03em;
-  position:relative;z-index:1;
-}
-.hero-badge .dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .hero h1{
-  font-family:var(--font-display);font-size:clamp(3rem,7vw,5.5rem);
-  line-height:1.05;font-weight:400;max-width:900px;
-  position:relative;z-index:1;margin-bottom:1.5rem;
+  font-family:var(--font-display);font-size:clamp(2.5rem,5.5vw,4.2rem);
+  line-height:1.1;font-weight:500;max-width:750px;margin-bottom:1.5rem;
 }
-.hero h1 em{font-style:italic;color:var(--accent)}
-.hero-sub{
-  font-size:1.15rem;color:var(--text-muted);max-width:600px;
-  line-height:1.7;position:relative;z-index:1;margin-bottom:3rem;
+.hero h1 em{font-style:italic;color:var(--accent);font-weight:700}
+.hero-lead{
+  font-size:1.1rem;color:var(--text-muted);max-width:580px;line-height:1.8;
+  margin-bottom:2.5rem;
 }
-.hero-actions{display:flex;gap:1rem;position:relative;z-index:1;flex-wrap:wrap;justify-content:center}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap}
 .btn{
-  padding:.75rem 1.75rem;border-radius:8px;font-size:.9rem;
-  font-weight:600;text-decoration:none;transition:all .25s;
+  padding:.7rem 1.5rem;border-radius:6px;font-size:.85rem;
+  font-weight:600;text-decoration:none;transition:all .2s;
   display:inline-flex;align-items:center;gap:.5rem;cursor:pointer;border:none;
 }
 .btn-primary{background:var(--accent);color:var(--bg)}
-.btn-primary:hover{filter:brightness(1.15);transform:translateY(-2px);box-shadow:0 8px 30px var(--accent-dim)}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border-bright)}
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 
-/* --- Floating lens SVG --- */
-.hero-lens{
-  position:absolute;width:500px;height:500px;opacity:.06;
-  top:50%;left:50%;transform:translate(-50%,-50%);
-  animation:rotate-slow 60s linear infinite;pointer-events:none;
+/* Product demo — attention heatmap */
+.hero-demo{
+  margin-top:3.5rem;position:relative;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:1.5rem;max-width:700px;
 }
-@keyframes rotate-slow{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.hero-demo-label{
+  font-family:var(--font-mono);font-size:.65rem;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;
+}
+.hero-demo svg{width:100%;height:auto;display:block;border-radius:6px}
 
-/* --- Section scaffolding --- */
-section{padding:6rem 2rem}
-.section-inner{max-width:var(--max-w);margin:0 auto}
-.reading{max-width:var(--reading-w);margin:0 auto}
-.section-label{
-  font-family:var(--font-mono);font-size:.72rem;
-  color:var(--accent);text-transform:uppercase;letter-spacing:.12em;
-  margin-bottom:.75rem;font-weight:500;
-}
+/* Section scaffolding */
+section{padding:5rem 2rem}
+.section-inner{max-width:1100px;margin:0 auto}
+.reading{max-width:68ch;margin:0 auto}
 .section-title{
-  font-family:var(--font-display);font-size:clamp(2rem,4vw,3rem);
-  line-height:1.15;margin-bottom:1rem;font-weight:400;
+  font-family:var(--font-display);font-size:clamp(1.8rem,3.5vw,2.6rem);
+  line-height:1.15;margin-bottom:.75rem;font-weight:500;
 }
-.section-desc{color:var(--text-muted);font-size:1.05rem;max-width:600px;line-height:1.7}
-.divider{
-  width:60px;height:1px;background:var(--border-bright);margin:0 auto;
-}
+.section-desc{color:var(--text-muted);font-size:1rem;max-width:540px;line-height:1.7}
 
-/* --- Origin story --- */
-.origin{background:var(--bg)}
-.origin-grid{
-  display:grid;grid-template-columns:1fr 1fr;gap:4rem;
-  align-items:start;margin-top:3rem;
-}
-.origin-text p{color:var(--text-muted);margin-bottom:1.25rem;font-size:.95rem;line-height:1.8}
+/* Origin grid */
+.origin-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:3.5rem;align-items:start;margin-top:2.5rem}
+.origin-text p{color:var(--text-muted);margin-bottom:1.1rem;font-size:.92rem;line-height:1.8}
 .origin-text strong{color:var(--text);font-weight:600}
 .quote-block{
-  border-left:2px solid var(--accent);padding:1.25rem 1.5rem;
-  background:var(--accent-glow);border-radius:0 8px 8px 0;
-  margin:1.5rem 0;font-style:italic;color:var(--text-muted);
-  font-size:.92rem;line-height:1.8;
+  border-left:2px solid var(--accent);padding:1rem 1.25rem;
+  background:var(--accent-soft);border-radius:0 6px 6px 0;
+  margin:1.25rem 0;color:var(--text-muted);font-size:.88rem;line-height:1.8;
 }
-.timeline{display:flex;flex-direction:column;gap:0;margin-top:1rem}
-.timeline-item{
-  display:flex;gap:1.25rem;padding:1rem 0;
-  border-left:1px solid var(--border);margin-left:8px;padding-left:1.5rem;
-  position:relative;
+.quote-block cite{display:block;font-size:.75rem;color:var(--text-dim);margin-top:.5rem;font-style:normal}
+
+/* Timeline */
+.timeline{display:flex;flex-direction:column;margin-top:.75rem}
+.tl-item{
+  display:grid;grid-template-columns:52px 1fr;gap:1rem;
+  padding:.85rem 0;border-left:1px solid var(--border);margin-left:6px;
+  padding-left:1.25rem;position:relative;
 }
-.timeline-item::before{
-  content:'';width:10px;height:10px;border-radius:50%;
-  background:var(--accent);position:absolute;left:-5.5px;top:1.25rem;
+.tl-item::before{
+  content:'';width:8px;height:8px;border-radius:50%;
+  background:var(--accent);position:absolute;left:-4.5px;top:1.1rem;
   border:2px solid var(--bg);
 }
-.timeline-year{
-  font-family:var(--font-mono);font-size:.75rem;color:var(--accent);
-  min-width:55px;font-weight:500;padding-top:2px;
-}
-.timeline-content{font-size:.88rem;color:var(--text-muted);line-height:1.6}
-.timeline-content strong{color:var(--text);font-weight:600}
+.tl-year{font-family:var(--font-mono);font-size:.72rem;color:var(--accent);font-weight:500;padding-top:1px}
+.tl-text{font-size:.84rem;color:var(--text-muted);line-height:1.6}
+.tl-text strong{color:var(--text);font-weight:600}
 
-/* --- Architecture diagram --- */
-.architecture{background:var(--surface)}
+/* Architecture */
+.arch-section{background:var(--surface)}
 .arch-diagram{
-  margin:3rem auto;max-width:1000px;
-  background:var(--bg);border:1px solid var(--border);border-radius:16px;
-  padding:2.5rem;overflow-x:auto;
+  margin:2.5rem auto;max-width:960px;
+  background:var(--bg);border:1px solid var(--border);border-radius:12px;
+  padding:2rem;overflow-x:auto;
 }
 .arch-diagram svg{width:100%;height:auto;display:block}
-.arch-features{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;
-  margin-top:3rem;
+.arch-row{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;
+  margin-top:2.5rem;
 }
-.arch-feature{
-  background:var(--bg);border:1px solid var(--border);border-radius:12px;
-  padding:1.5rem;transition:all .3s;
+.arch-item{
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:1.25rem;transition:border-color .2s;
 }
-.arch-feature:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 30px var(--accent-glow)}
-.arch-feature h4{
-  font-family:var(--font-body);font-size:.9rem;font-weight:600;
-  margin-bottom:.5rem;display:flex;align-items:center;gap:.5rem;
-}
-.arch-feature p{font-size:.82rem;color:var(--text-muted);line-height:1.6}
-.feature-icon{
-  width:28px;height:28px;border-radius:6px;display:inline-flex;
-  align-items:center;justify-content:center;font-size:.8rem;
-}
+.arch-item:hover{border-color:var(--accent)}
+.arch-item h4{font-size:.88rem;font-weight:600;margin-bottom:.4rem}
+.arch-item p{font-size:.8rem;color:var(--text-muted);line-height:1.6}
+.arch-item code{font-family:var(--font-mono);font-size:.75rem;background:var(--surface-raised);padding:.1rem .35rem;border-radius:3px;color:var(--accent)}
 
-/* --- Models grid --- */
-.models{background:var(--bg)}
-.model-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
-  gap:1.5rem;margin-top:3rem;
-}
+/* Models */
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem;margin-top:2.5rem}
 .model-card{
-  background:var(--bg-card);border:1px solid var(--border);
-  border-radius:14px;padding:1.75rem;transition:all .3s;position:relative;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:1.5rem;transition:border-color .25s;position:relative;overflow:hidden;
 }
-.model-card::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  border-radius:14px 14px 0 0;
-}
-.model-card:hover{border-color:var(--border-bright);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.3)}
-.model-card h3{
-  font-size:1.05rem;font-weight:600;margin-bottom:.25rem;
-  display:flex;align-items:center;gap:.5rem;
-}
-.model-card .adapter-badge{
-  font-family:var(--font-mono);font-size:.65rem;padding:.2rem .5rem;
-  border-radius:4px;font-weight:500;
-}
-.model-card .families{color:var(--text-muted);font-size:.82rem;margin-bottom:.75rem;line-height:1.5}
-.model-card .checkpoints{
-  font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim);
-  line-height:1.7;word-break:break-all;
-}
-.model-card .status{
-  display:inline-flex;align-items:center;gap:.35rem;
-  font-size:.72rem;font-weight:600;margin-top:.75rem;
-  padding:.2rem .6rem;border-radius:4px;
-}
-.status-pass{background:#06d6a022;color:#06d6a0}
-.status-partial{background:#f59e0b22;color:#f59e0b}
-.status-experimental{background:#8b5cf622;color:#8b5cf6}
+.model-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
+.model-card:hover{border-color:var(--border-bright)}
+.model-card h3{font-size:.95rem;font-weight:600;margin-bottom:.2rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.model-card .badge{font-family:var(--font-mono);font-size:.62rem;padding:.15rem .45rem;border-radius:3px;font-weight:500}
+.model-card .desc{color:var(--text-muted);font-size:.8rem;margin-bottom:.6rem;line-height:1.5}
+.model-card .code{font-family:var(--font-mono);font-size:.68rem;color:var(--text-dim);line-height:1.7;word-break:break-all}
+.model-card .aliases{font-size:.72rem;color:var(--text-dim);margin-top:.6rem}
+.model-card .aliases span{color:var(--text-muted)}
+.model-card .status{display:inline-flex;font-size:.68rem;font-weight:600;margin-top:.6rem;padding:.15rem .5rem;border-radius:3px}
+.s-pass{background:#34d39918;color:#34d399}
+.s-partial{background:#f0a85818;color:#f0a858}
+.s-exp{background:#a78bfa18;color:#a78bfa}
+.model-card.c-clip::before{background:var(--accent)}
+.model-card.c-clip .badge{background:var(--accent-soft);color:var(--accent)}
+.model-card.c-blip::before{background:var(--warm)}
+.model-card.c-blip .badge{background:var(--warm-soft);color:var(--warm)}
+.model-card.c-llava::before{background:var(--violet)}
+.model-card.c-llava .badge{background:var(--violet-soft);color:var(--violet)}
+.model-card.c-gen::before{background:var(--rose)}
+.model-card.c-gen .badge{background:var(--rose-soft);color:var(--rose)}
 
-/* colored tops */
-.model-card.clip::before{background:var(--accent)}
-.model-card.clip .adapter-badge{background:var(--accent-dim);color:var(--accent)}
-.model-card.blip::before{background:var(--accent2)}
-.model-card.blip .adapter-badge{background:var(--accent2-dim);color:var(--accent2)}
-.model-card.llava::before{background:var(--accent3)}
-.model-card.llava .adapter-badge{background:var(--accent3-dim);color:var(--accent3)}
-.model-card.generic::before{background:var(--accent4)}
-.model-card.generic .adapter-badge{background:var(--accent4-dim);color:var(--accent4)}
-
-/* --- Capabilities --- */
-.capabilities{background:var(--surface)}
-.cap-grid{
-  display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;
-  margin-top:3rem;
-}
+/* Capabilities — no numbers */
+.cap-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem;margin-top:2.5rem}
 .cap-card{
-  background:var(--bg);border:1px solid var(--border);border-radius:14px;
-  padding:2rem;transition:all .3s;position:relative;
+  background:var(--bg);border:1px solid var(--border);border-radius:12px;
+  padding:1.5rem;transition:border-color .2s;
 }
-.cap-card:hover{border-color:var(--accent);box-shadow:0 0 40px var(--accent-glow)}
-.cap-card .cap-num{
-  font-family:var(--font-mono);font-size:.7rem;color:var(--accent);
-  margin-bottom:.75rem;font-weight:500;
-}
-.cap-card h3{font-size:1.05rem;font-weight:600;margin-bottom:.5rem}
-.cap-card p{font-size:.85rem;color:var(--text-muted);line-height:1.7}
-.cap-card code{
-  font-family:var(--font-mono);font-size:.78rem;
-  background:var(--surface-raised);padding:.15rem .4rem;border-radius:4px;
-  color:var(--accent);
-}
+.cap-card:hover{border-color:var(--accent)}
+.cap-card h3{font-size:.95rem;font-weight:600;margin-bottom:.4rem}
+.cap-card p{font-size:.82rem;color:var(--text-muted);line-height:1.7}
+.cap-card code{font-family:var(--font-mono);font-size:.75rem;background:var(--surface-raised);padding:.1rem .35rem;border-radius:3px;color:var(--accent)}
 
-/* --- Pipeline / How it works --- */
-.pipeline{background:var(--bg)}
+/* Pipeline — no numbers */
 .pipeline-flow{
-  display:flex;align-items:stretch;gap:0;margin:3rem auto;
-  max-width:1100px;overflow-x:auto;padding-bottom:1rem;
+  display:flex;align-items:stretch;gap:0;margin:2.5rem auto;max-width:1060px;overflow-x:auto;
 }
-.pipeline-step{
-  flex:1;min-width:200px;padding:1.75rem 1.5rem;
-  background:var(--bg-card);border:1px solid var(--border);
-  position:relative;transition:all .3s;
+.p-step{
+  flex:1;min-width:180px;padding:1.4rem 1.25rem;
+  background:var(--surface);border:1px solid var(--border);
+  position:relative;transition:border-color .2s;
 }
-.pipeline-step:first-child{border-radius:14px 0 0 14px}
-.pipeline-step:last-child{border-radius:0 14px 14px 0}
-.pipeline-step:not(:last-child)::after{
-  content:'→';position:absolute;right:-14px;top:50%;transform:translateY(-50%);
-  font-size:1.2rem;color:var(--accent);z-index:2;
-  width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+.p-step:first-child{border-radius:10px 0 0 10px}
+.p-step:last-child{border-radius:0 10px 10px 0}
+.p-step:not(:last-child)::after{
+  content:'\2192';position:absolute;right:-13px;top:50%;transform:translateY(-50%);
+  font-size:1rem;color:var(--accent);z-index:2;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
   background:var(--bg);border-radius:50%;border:1px solid var(--border);
 }
-.pipeline-step:hover{border-color:var(--accent);z-index:1}
-.pipeline-step .step-num{
-  font-family:var(--font-mono);font-size:.65rem;color:var(--accent);
-  font-weight:600;letter-spacing:.05em;margin-bottom:.5rem;
-}
-.pipeline-step h4{font-size:.9rem;font-weight:600;margin-bottom:.4rem}
-.pipeline-step p{font-size:.78rem;color:var(--text-muted);line-height:1.6}
+.p-step:hover{border-color:var(--accent);z-index:1}
+.p-step h4{font-size:.85rem;font-weight:600;margin-bottom:.3rem}
+.p-step p{font-size:.75rem;color:var(--text-muted);line-height:1.6}
 
-/* --- Methodology / math --- */
-.methodology{background:var(--surface)}
-.method-grid{
-  display:grid;grid-template-columns:repeat(2,1fr);gap:2rem;
-  margin-top:3rem;
-}
-.method-block{
-  background:var(--bg);border:1px solid var(--border);border-radius:12px;
-  padding:2rem;
-}
-.method-block h3{
-  font-size:1rem;font-weight:600;margin-bottom:1rem;
-  display:flex;align-items:center;gap:.5rem;
-}
+/* Methodology */
+.method-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;margin-top:2.5rem}
+.method-block{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.5rem}
+.method-block h3{font-size:.92rem;font-weight:600;margin-bottom:.75rem}
 .math{
-  font-family:var(--font-mono);font-size:.85rem;
-  background:var(--surface-raised);padding:1rem 1.25rem;
-  border-radius:8px;color:var(--accent);line-height:2;
-  margin:.75rem 0;border:1px solid var(--border);
+  font-family:var(--font-mono);font-size:.8rem;
+  background:var(--surface-raised);padding:.85rem 1rem;
+  border-radius:6px;color:var(--accent);line-height:2;
+  margin:.6rem 0;border:1px solid var(--border);
 }
-.method-block p{font-size:.85rem;color:var(--text-muted);line-height:1.7;margin-top:.75rem}
+.method-block p{font-size:.82rem;color:var(--text-muted);line-height:1.7;margin-top:.6rem}
+.tuple-box{
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;
+  padding:1.75rem;text-align:center;margin-top:2.5rem;max-width:680px;margin-left:auto;margin-right:auto;
+}
+.tuple-box .formula{font-family:var(--font-mono);font-size:1.2rem;color:var(--accent);margin:.75rem 0}
+.tuple-box p{font-size:.88rem;color:var(--text-muted);max-width:480px;margin:0 auto;line-height:1.7}
 
-/* --- Features list --- */
-.features-list{
-  display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;
-  margin-top:3rem;
-}
-.feature-item{
-  display:flex;align-items:flex-start;gap:.75rem;
-  padding:1rem 1.25rem;background:var(--bg-card);
-  border:1px solid var(--border);border-radius:10px;
-  transition:all .2s;
-}
-.feature-item:hover{border-color:var(--accent)}
-.feature-check{
-  width:20px;height:20px;border-radius:50%;
-  background:var(--accent-dim);display:flex;align-items:center;
-  justify-content:center;flex-shrink:0;margin-top:2px;
-  color:var(--accent);font-size:.7rem;font-weight:700;
-}
-.feature-item span{font-size:.85rem;color:var(--text-muted);line-height:1.5}
-.feature-item strong{color:var(--text);font-weight:600}
-
-/* --- Code block --- */
-.code-block{
-  background:var(--bg);border:1px solid var(--border);border-radius:12px;
-  overflow:hidden;margin:2rem 0;
-}
-.code-header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:.6rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);
-}
-.code-header span{font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)}
-.code-dots{display:flex;gap:6px}
-.code-dots i{width:10px;height:10px;border-radius:50%;display:block}
-.code-dots i:nth-child(1){background:#ef4444}
-.code-dots i:nth-child(2){background:#f59e0b}
-.code-dots i:nth-child(3){background:#22c55e}
-.code-body{
-  padding:1.25rem 1.5rem;overflow-x:auto;
-  font-family:var(--font-mono);font-size:.78rem;
-  line-height:1.9;color:var(--text-muted);
-}
-.code-body .kw{color:var(--accent3)}
+/* Code block */
+.code-block{background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:2rem 0}
+.code-bar{display:flex;align-items:center;justify-content:space-between;padding:.5rem .85rem;background:var(--surface);border-bottom:1px solid var(--border)}
+.code-bar span{font-family:var(--font-mono);font-size:.68rem;color:var(--text-dim)}
+.dots{display:flex;gap:5px}
+.dots i{width:9px;height:9px;border-radius:50%;display:block}
+.dots i:nth-child(1){background:#ef4444}
+.dots i:nth-child(2){background:#f59e0b}
+.dots i:nth-child(3){background:#22c55e}
+.code-body{padding:1rem 1.25rem;overflow-x:auto;font-family:var(--font-mono);font-size:.74rem;line-height:1.9;color:var(--text-muted)}
+.code-body .kw{color:var(--violet)}
 .code-body .fn{color:var(--accent)}
-.code-body .str{color:var(--accent2)}
+.code-body .str{color:var(--warm)}
 .code-body .cmt{color:var(--text-dim);font-style:italic}
-.code-body .var{color:var(--accent4)}
 .code-body .op{color:var(--text-dim)}
 
-/* --- Footer --- */
-footer{
-  padding:4rem 2rem;border-top:1px solid var(--border);
-  text-align:center;background:var(--bg);
-}
-footer p{color:var(--text-dim);font-size:.82rem;line-height:1.8}
+/* Footer */
+footer{padding:3.5rem 2rem;border-top:1px solid var(--border);text-align:center}
+footer p{color:var(--text-dim);font-size:.78rem;line-height:1.8}
 footer a{color:var(--accent);text-decoration:none}
 footer a:hover{text-decoration:underline}
-.footer-links{display:flex;gap:2rem;justify-content:center;margin-bottom:1.5rem;flex-wrap:wrap}
-.footer-links a{color:var(--text-muted);font-size:.85rem;font-weight:500}
+.f-links{display:flex;gap:1.75rem;justify-content:center;margin-bottom:1.25rem;flex-wrap:wrap}
+.f-links a{color:var(--text-muted);font-size:.82rem;font-weight:500}
+.f-links a:hover{color:var(--accent)}
 
-/* --- Scroll reveal --- */
-.reveal{opacity:0;transform:translateY(30px);transition:all .7s cubic-bezier(.16,1,.3,1)}
-.reveal.visible{opacity:1;transform:translateY(0)}
-.reveal-delay-1{transition-delay:.1s}
-.reveal-delay-2{transition-delay:.2s}
-.reveal-delay-3{transition-delay:.3s}
+/* Scroll reveal — varied, not identical */
+.sr{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.sr.v{opacity:1;transform:translateY(0)}
+.sr-left{opacity:0;transform:translateX(-30px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.sr-left.v{opacity:1;transform:translateX(0)}
+.sr-scale{opacity:0;transform:scale(.95);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1)}
+.sr-scale.v{opacity:1;transform:scale(1)}
+.d1{transition-delay:.08s}.d2{transition-delay:.16s}.d3{transition-delay:.24s}
 
-/* --- Responsive --- */
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  .sr,.sr-left,.sr-scale{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+
+/* Responsive */
 @media(max-width:900px){
   .origin-grid{grid-template-columns:1fr;gap:2rem}
-  .arch-features{grid-template-columns:1fr}
+  .arch-row{grid-template-columns:1fr}
   .cap-grid{grid-template-columns:1fr}
   .method-grid{grid-template-columns:1fr}
-  .features-list{grid-template-columns:1fr}
   .model-grid{grid-template-columns:1fr}
   .pipeline-flow{flex-direction:column}
-  .pipeline-step{border-radius:0!important}
-  .pipeline-step:first-child{border-radius:14px 14px 0 0!important}
-  .pipeline-step:last-child{border-radius:0 0 14px 14px!important}
-  .pipeline-step:not(:last-child)::after{content:'↓';right:50%;top:auto;bottom:-14px;transform:translateX(50%)}
+  .p-step{border-radius:0!important}
+  .p-step:first-child{border-radius:10px 10px 0 0!important}
+  .p-step:last-child{border-radius:0 0 10px 10px!important}
+  .p-step:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-13px;transform:translateX(50%)}
   .nav-links{display:none}
-  section{padding:4rem 1.25rem}
+  .hamburger{display:block}
+  section{padding:3.5rem 1.25rem}
 }
 @media(max-width:600px){
-  .hero{padding:6rem 1.25rem 4rem}
+  .hero{padding:5rem 1.25rem 3rem}
   .hero-actions{flex-direction:column;align-items:stretch}
 }
 </style>
 </head>
 <body>
 
+<a href="#main" class="skip-link">Skip to content</a>
+
 <!-- Nav -->
-<nav id="nav">
-  <a href="#" class="nav-logo">
-    <span class="lens"></span>
+<nav id="nav" role="navigation" aria-label="Main navigation">
+  <a href="#" class="nav-logo" aria-label="MultiModal-Lens home">
+    <span class="lens" aria-hidden="true"></span>
     MultiModal-Lens
   </a>
   <ul class="nav-links">
-    <li><a href="#origin">Origin</a></li>
+    <li><a href="#origin">Why</a></li>
     <li><a href="#architecture">Architecture</a></li>
     <li><a href="#models">Models</a></li>
     <li><a href="#capabilities">Capabilities</a></li>
     <li><a href="#methodology">Methodology</a></li>
   </ul>
-  <a href="https://github.com/AKHegde22/Papers-C" class="nav-cta" target="_blank" rel="noopener">GitHub →</a>
+  <a href="https://github.com/AKHegde22/MultiModal-Lens" class="nav-cta" target="_blank" rel="noopener">GitHub</a>
+  <button class="hamburger" aria-label="Toggle menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div class="mobile-menu" role="dialog" aria-label="Mobile navigation">
+  <a href="#origin">Why We Built This</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#models">Supported Models</a>
+  <a href="#capabilities">Capabilities</a>
+  <a href="#methodology">Methodology</a>
+  <a href="https://github.com/AKHegde22/MultiModal-Lens" target="_blank" rel="noopener">GitHub</a>
+</div>
 
-<!-- Hero -->
-<section class="hero" id="top">
-  <svg class="hero-lens" viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="250" cy="250" r="200" stroke="var(--accent)" stroke-width="0.5" opacity=".4"/>
-    <circle cx="250" cy="250" r="150" stroke="var(--accent)" stroke-width="0.5" opacity=".3"/>
-    <circle cx="250" cy="250" r="100" stroke="var(--accent)" stroke-width="0.5" opacity=".2"/>
-    <circle cx="250" cy="250" r="50" stroke="var(--accent)" stroke-width="1" opacity=".5"/>
-    <line x1="50" y1="250" x2="450" y2="250" stroke="var(--accent)" stroke-width="0.3" opacity=".3"/>
-    <line x1="250" y1="50" x2="250" y2="450" stroke="var(--accent)" stroke-width="0.3" opacity=".3"/>
-    <line x1="108" y1="108" x2="392" y2="392" stroke="var(--accent)" stroke-width="0.3" opacity=".2"/>
-    <line x1="392" y1="108" x2="108" y2="392" stroke="var(--accent)" stroke-width="0.3" opacity=".2"/>
-  </svg>
+<main id="main">
 
-  <div class="hero-badge">
-    <span class="dot"></span>
-    v0.2.0 &mdash; MIT License
-  </div>
-
-  <h1>Looking Inside<br>Vision-Language <em>Models</em></h1>
-
-  <p class="hero-sub">
-    MultimodalLens is a mechanistic interpretability toolkit that lets you inspect
-    attention, alignment, and causal circuits across 20+ Hugging Face VLM architectures.
-    Inspired by TransformerLens, built for the multimodal era.
+<!-- Hero: Origin story leads -->
+<section class="hero">
+  <p class="hero-kicker">Mechanistic interpretability for VLMs</p>
+  <h1>TransformerLens changed how we debug language models. <em>Nothing did the same for vision.</em></h1>
+  <p class="hero-lead">
+    MultimodalLens is the missing toolkit. It inspects attention, alignment, and causal
+    circuits across 20+ Hugging Face vision-language model architectures, from CLIP to LLaVA,
+    with built-in faithfulness checks so your heatmaps don't lie to you.
   </p>
-
   <div class="hero-actions">
     <a href="https://pypi.org/project/multimodallens/" class="btn btn-primary" target="_blank" rel="noopener">pip install multimodallens</a>
-    <a href="#architecture" class="btn btn-ghost">Explore the Architecture ↓</a>
+    <a href="https://github.com/AKHegde22/MultiModal-Lens" class="btn btn-ghost" target="_blank" rel="noopener">View on GitHub</a>
+  </div>
+
+  <!-- Product demo: SVG attention heatmap visualization -->
+  <div class="hero-demo sr-scale">
+    <p class="hero-demo-label">Attention rollout output from CLIP on a cat photo</p>
+    <svg viewBox="0 0 640 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Example attention heatmap output showing a cat photo with highlighted regions around the cat's face and body">
+      <!-- Background — simulated photo -->
+      <rect width="640" height="360" rx="6" fill="#1a2332"/>
+      <!-- Simulated image content -->
+      <rect x="40" y="30" width="320" height="300" rx="4" fill="#162030"/>
+      <ellipse cx="200" cy="200" rx="100" ry="80" fill="#1e3048"/>
+      <ellipse cx="200" cy="180" rx="60" ry="45" fill="#253d58"/>
+      <circle cx="175" cy="165" r="8" fill="#34d39940"/>
+      <circle cx="225" cy="165" r="8" fill="#34d39940"/>
+      <ellipse cx="200" cy="185" rx="12" ry="6" fill="#34d39930"/>
+      <!-- Ears -->
+      <polygon points="145,130 160,90 175,130" fill="#1e3048"/>
+      <polygon points="225,130 240,90 255,130" fill="#1e3048"/>
+      <!-- Attention heatmap overlay -->
+      <ellipse cx="200" cy="175" rx="80" ry="65" fill="url(#heat1)" opacity=".7"/>
+      <ellipse cx="180" cy="160" rx="35" ry="30" fill="url(#heat2)" opacity=".85"/>
+      <ellipse cx="220" cy="160" rx="35" ry="30" fill="url(#heat2)" opacity=".85"/>
+      <ellipse cx="200" cy="175" rx="20" ry="18" fill="url(#heat3)" opacity=".9"/>
+      <defs>
+        <radialGradient id="heat1" cx="50%" cy="50%"><stop offset="0%" stop-color="#34d399" stop-opacity=".5"/><stop offset="100%" stop-color="#34d399" stop-opacity="0"/></radialGradient>
+        <radialGradient id="heat2" cx="50%" cy="50%"><stop offset="0%" stop-color="#f0a858" stop-opacity=".6"/><stop offset="100%" stop-color="#f0a858" stop-opacity="0"/></radialGradient>
+        <radialGradient id="heat3" cx="50%" cy="50%"><stop offset="0%" stop-color="#ef4444" stop-opacity=".7"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></radialGradient>
+      </defs>
+      <!-- Right side: alignment matrix preview -->
+      <rect x="390" y="30" width="220" height="300" rx="4" fill="#162030"/>
+      <text x="500" y="55" fill="#8da0c0" font-size="10" text-anchor="middle" font-family="Inter,sans-serif" font-weight="500">Token-Patch Alignment</text>
+      <!-- Grid cells representing alignment scores -->
+      <g transform="translate(410,70)" font-family="JetBrains Mono,monospace" font-size="7">
+        <text x="0" y="0" fill="#6b82a8">a</text><text x="20" y="0" fill="#6b82a8">photo</text><text x="55" y="0" fill="#6b82a8">of</text><text x="72" y="0" fill="#6b82a8">a</text><text x="88" y="0" fill="#6b82a8">cat</text>
+        <!-- Row labels and heatmap cells -->
+        <g transform="translate(0,15)">
+          <text x="0" y="0" fill="#34d399" font-size="6">p1</text>
+          <rect x="22" y="-8" width="14" height="10" rx="2" fill="#34d39920"/>
+          <rect x="38" y="-8" width="14" height="10" rx="2" fill="#34d39915"/>
+          <rect x="54" y="-8" width="14" height="10" rx="2" fill="#34d39910"/>
+          <rect x="70" y="-8" width="14" height="10" rx="2" fill="#34d39918"/>
+          <rect x="86" y="-8" width="14" height="10" rx="2" fill="#34d39950"/>
+        </g>
+        <g transform="translate(0,30)">
+          <text x="0" y="0" fill="#6b82a8" font-size="6">p2</text>
+          <rect x="22" y="-8" width="14" height="10" rx="2" fill="#34d39910"/>
+          <rect x="38" y="-8" width="14" height="10" rx="2" fill="#34d39940"/>
+          <rect x="54" y="-8" width="14" height="10" rx="2" fill="#34d39912"/>
+          <rect x="70" y="-8" width="14" height="10" rx="2" fill="#34d39908"/>
+          <rect x="86" y="-8" width="14" height="10" rx="2" fill="#34d39918"/>
+        </g>
+        <g transform="translate(0,45)">
+          <text x="0" y="0" fill="#6b82a8" font-size="6">p3</text>
+          <rect x="22" y="-8" width="14" height="10" rx="2" fill="#34d39908"/>
+          <rect x="38" y="-8" width="14" height="10" rx="2" fill="#34d3990a"/>
+          <rect x="54" y="-8" width="14" height="10" rx="2" fill="#34d39935"/>
+          <rect x="70" y="-8" width="14" height="10" rx="2" fill="#34d3990c"/>
+          <rect x="86" y="-8" width="14" height="10" rx="2" fill="#34d39922"/>
+        </g>
+        <g transform="translate(0,60)">
+          <text x="0" y="0" fill="#6b82a8" font-size="6">p4</text>
+          <rect x="22" y="-8" width="14" height="10" rx="2" fill="#34d39905"/>
+          <rect x="38" y="-8" width="14" height="10" rx="2" fill="#34d39908"/>
+          <rect x="54" y="-8" width="14" height="10" rx="2" fill="#34d39910"/>
+          <rect x="70" y="-8" width="14" height="10" rx="2" fill="#34d39906"/>
+          <rect x="86" y="-8" width="14" height="10" rx="2" fill="#34d3990a"/>
+        </g>
+      </g>
+      <!-- Token scores -->
+      <text x="500" y="170" fill="#8da0c0" font-size="9" text-anchor="middle" font-family="Inter,sans-serif" font-weight="500">Token Salience</text>
+      <g transform="translate(410,185)" font-family="JetBrains Mono,monospace" font-size="7.5">
+        <text x="0" y="0" fill="#6b82a8">"cat"</text>
+        <rect x="55" y="-7" width="85" height="8" rx="2" fill="#34d399"/>
+        <text x="0" y="18" fill="#6b82a8">"photo"</text>
+        <rect x="55" y="11" width="50" height="8" rx="2" fill="#34d39990"/>
+        <text x="0" y="36" fill="#6b82a8">"a"</text>
+        <rect x="55" y="29" width="12" height="8" rx="2" fill="#34d39940"/>
+        <text x="0" y="54" fill="#6b82a8">"of"</text>
+        <rect x="55" y="47" width="8" height="8" rx="2" fill="#34d39925"/>
+      </g>
+    </svg>
   </div>
 </section>
 
-<!-- Origin Story -->
-<section class="origin" id="origin">
+<!-- Origin: why this exists -->
+<section id="origin">
   <div class="section-inner">
     <div class="origin-grid">
-      <div class="origin-text reveal">
-        <p class="section-label">The Origin</p>
+      <div class="origin-text sr-left">
         <h2 class="section-title">Why We Built This</h2>
-
         <p>
           <strong>TransformerLens</strong> changed how we debug language models. It gave researchers
-          a way to look inside transformers — caching activations, tracing attention heads,
-          and running causal interventions with a few lines of code. But when the field moved
-          to <strong>vision-language models</strong>, that toolkit hit a wall.
+          a way to look inside transformers: caching activations, tracing attention heads,
+          running causal interventions with a few lines of code. But when the field moved to
+          <strong>vision-language models</strong>, that toolkit hit a wall.
         </p>
-
         <div class="quote-block">
-          "Vision-language models expose rich internals — attentions, hidden states, embeddings —
-          but interpretability tooling remains architecture-specific and difficult to operationalize."
-          <br><span style="font-style:normal;font-size:.78rem;color:var(--text-dim)">— MultimodalLens Research Paper</span>
+          "Vision-language models expose rich internals: attentions, hidden states, embeddings.
+          But interpretability tooling remains architecture-specific and difficult to operationalize."
+          <cite>MultimodalLens Research Paper</cite>
         </div>
-
         <p>
           Every VLM family handles images differently. <strong>CLIP</strong> uses dual encoders.
           <strong>BLIP-2</strong> routes through a Q-Former. <strong>LLaVA</strong> interleaves
           image tokens into a decoder. Each requires its own extraction logic, its own attention
           surgery, its own faithfulness testing. There was no unified tool.
         </p>
-
         <p>
-          MultimodalLens fills that gap — a single adapterized framework that normalizes
-          the chaos of 20+ VLM architectures into one clean debugging interface, with
+          MultimodalLens fills that gap. A single adapterized framework that normalizes
+          the chaos of 20+ VLM architectures into one debugging interface, with
           built-in faithfulness checks to make sure your heatmaps aren't lying to you.
         </p>
       </div>
-
-      <div class="reveal reveal-delay-2">
-        <p class="section-label" style="margin-top:1rem">Timeline</p>
-        <h3 class="section-title" style="font-size:1.6rem">Key Milestones</h3>
+      <div class="sr d2">
+        <h3 class="section-title" style="font-size:1.4rem">Milestones</h3>
         <div class="timeline">
-          <div class="timeline-item">
-            <span class="timeline-year">2019</span>
-            <div class="timeline-content"><strong>BertViz</strong> popularizes interactive attention visualization for language transformers</div>
+          <div class="tl-item">
+            <span class="tl-year">2019</span>
+            <div class="tl-text"><strong>BertViz</strong> popularizes interactive attention visualization for language transformers</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2022</span>
-            <div class="timeline-content"><strong>TransformerLens</strong> ships mechanistic interpretability as a first-class API for LLMs</div>
+          <div class="tl-item">
+            <span class="tl-year">2022</span>
+            <div class="tl-text"><strong>TransformerLens</strong> ships mechanistic interpretability as a first-class API for LLMs</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2023</span>
-            <div class="timeline-content"><strong>Jain & Wallace</strong> demonstrate "Attention is not Explanation" — faithfulness becomes critical</div>
+          <div class="tl-item">
+            <span class="tl-year">2023</span>
+            <div class="tl-text">Jain & Wallace show "Attention is not Explanation." Faithfulness testing becomes critical</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2023</span>
-            <div class="timeline-content"><strong>CLIP, BLIP-2, LLaVA</strong> drive VLM adoption; no unified interpretability tooling exists</div>
+          <div class="tl-item">
+            <span class="tl-year">2023</span>
+            <div class="tl-text"><strong>CLIP, BLIP-2, LLaVA</strong> drive VLM adoption. No unified interpretability tooling exists</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2024</span>
-            <div class="timeline-content">VLM ecosystem explodes — Qwen2-VL, InternVL, PaliGemma, Pixtral, Idefics3, and more</div>
+          <div class="tl-item">
+            <span class="tl-year">2024</span>
+            <div class="tl-text">VLM ecosystem explodes: Qwen2-VL, InternVL, PaliGemma, Pixtral, Idefics3, and more</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2025</span>
-            <div class="timeline-content"><strong>MultimodalLens v0.1.0</strong> — adapterized framework supporting 20+ families with faithfulness diagnostics</div>
+          <div class="tl-item">
+            <span class="tl-year">2025</span>
+            <div class="tl-text"><strong>MultimodalLens v0.1.0</strong> with adapterized framework and faithfulness diagnostics</div>
           </div>
-          <div class="timeline-item">
-            <span class="timeline-year">2026</span>
-            <div class="timeline-content"><strong>v0.2.0</strong> — Mechanistic probes, DLA, path patching, interactive dashboards, PyPI release</div>
+          <div class="tl-item">
+            <span class="tl-year">2026</span>
+            <div class="tl-text"><strong>v0.2.0</strong>: mechanistic probes, DLA, path patching, interactive dashboards, PyPI</div>
           </div>
         </div>
       </div>
@@ -530,401 +510,266 @@ footer a:hover{text-decoration:underline}
   </div>
 </section>
 
-<div class="divider"></div>
-
 <!-- Architecture -->
-<section class="architecture" id="architecture">
+<section class="arch-section" id="architecture">
   <div class="section-inner">
     <div class="reading">
-      <p class="section-label reveal">Architecture</p>
-      <h2 class="section-title reveal">Adapterized Model Abstraction</h2>
-      <p class="section-desc reveal">
-        All model-specific logic is isolated behind a single <code>ModelAdapter</code> interface.
-        The UI, CLI, and evaluation layers stay completely architecture-agnostic.
+      <h2 class="section-title sr">One Interface, Every Architecture</h2>
+      <p class="section-desc sr">
+        All model-specific logic is isolated behind a single <code style="font-family:var(--font-mono);font-size:.88rem;color:var(--accent)">ModelAdapter</code> interface.
+        The UI, CLI, and evaluation layers stay architecture-agnostic.
       </p>
     </div>
 
-    <!-- SVG Architecture Diagram -->
-    <div class="arch-diagram reveal">
-      <svg viewBox="0 0 960 520" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
-        <!-- Background grid dots -->
+    <div class="arch-diagram sr-scale">
+      <svg viewBox="0 0 900 480" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif" role="img" aria-label="Architecture diagram showing the adapterized model abstraction layers">
         <defs>
-          <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="10" cy="10" r="0.8" fill="#334155" opacity="0.5"/>
+          <pattern id="g" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse">
+            <circle cx="9" cy="9" r=".6" fill="#2d4270" opacity=".4"/>
           </pattern>
-          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-        <rect width="960" height="520" fill="url(#dots)" rx="12"/>
+        <rect width="900" height="480" fill="url(#g)" rx="10"/>
 
-        <!-- User Layer -->
-        <rect x="40" y="30" width="880" height="80" rx="10" fill="#111827" stroke="#334155" stroke-width="1"/>
-        <text x="60" y="58" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="0.05em">USER LAYER</text>
-        <text x="60" y="82" fill="#e2e8f0" font-size="13" font-weight="500">Image + Text Prompt</text>
-        <!-- Icons -->
-        <rect x="320" y="50" width="50" height="44" rx="6" fill="#1e293b" stroke="#06d6a0" stroke-width="1"/>
-        <text x="345" y="77" fill="#06d6a0" font-size="11" text-anchor="middle">IMG</text>
-        <text x="395" y="77" fill="#64748b" font-size="16">+</text>
-        <rect x="420" y="50" width="50" height="44" rx="6" fill="#1e293b" stroke="#8b5cf6" stroke-width="1"/>
-        <text x="445" y="77" fill="#8b5cf6" font-size="11" text-anchor="middle">TXT</text>
-        <text x="500" y="77" fill="#64748b" font-size="12">→</text>
-        <rect x="530" y="50" width="120" height="44" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
-        <text x="590" y="77" fill="#f59e0b" font-size="11" text-anchor="middle">AutoProcessor</text>
+        <!-- Input -->
+        <rect x="30" y="24" width="840" height="68" rx="8" fill="#111a2e" stroke="#2d4270" stroke-width="1"/>
+        <text x="50" y="48" fill="#6b82a8" font-size="10" font-weight="600" letter-spacing=".06em">INPUT</text>
+        <text x="50" y="72" fill="#e0e7f1" font-size="12" font-weight="500">Image + Text Prompt</text>
+        <rect x="300" y="40" width="44" height="36" rx="5" fill="#182240" stroke="#34d399" stroke-width=".8"/>
+        <text x="322" y="63" fill="#34d399" font-size="9" text-anchor="middle">IMG</text>
+        <text x="362" y="63" fill="#6b82a8" font-size="13">+</text>
+        <rect x="380" y="40" width="44" height="36" rx="5" fill="#182240" stroke="#a78bfa" stroke-width=".8"/>
+        <text x="402" y="63" fill="#a78bfa" font-size="9" text-anchor="middle">TXT</text>
+        <text x="444" y="63" fill="#6b82a8" font-size="11">&rarr;</text>
+        <rect x="464" y="40" width="100" height="36" rx="5" fill="#182240" stroke="#f0a858" stroke-width=".8"/>
+        <text x="514" y="63" fill="#f0a858" font-size="9" text-anchor="middle">AutoProcessor</text>
 
-        <!-- Arrow down -->
-        <line x1="480" y1="110" x2="480" y2="140" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <polygon points="476,138 480,148 484,138" fill="#334155"/>
+        <line x1="450" y1="92" x2="450" y2="118" stroke="#2d4270" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <polygon points="446,116 450,124 454,116" fill="#2d4270"/>
 
-        <!-- Core Engine -->
-        <rect x="200" y="150" width="560" height="100" rx="10" fill="#111827" stroke="#06d6a0" stroke-width="1.5"/>
-        <text x="220" y="178" fill="#06d6a0" font-size="11" font-weight="600" letter-spacing="0.05em">CORE ENGINE</text>
+        <!-- Core -->
+        <rect x="180" y="130" width="540" height="88" rx="8" fill="#111a2e" stroke="#34d399" stroke-width="1.2"/>
+        <text x="200" y="154" fill="#34d399" font-size="10" font-weight="600" letter-spacing=".06em">CORE ENGINE</text>
+        <rect x="200" y="168" width="140" height="34" rx="5" fill="#34d39912" stroke="#34d399" stroke-width=".8"/>
+        <text x="270" y="190" fill="#34d399" font-size="10" text-anchor="middle" font-weight="500">HookedVLM</text>
+        <rect x="360" y="168" width="140" height="34" rx="5" fill="#34d39912" stroke="#34d399" stroke-width=".8"/>
+        <text x="430" y="190" fill="#34d399" font-size="10" text-anchor="middle" font-weight="500">LensPipeline</text>
+        <rect x="520" y="168" width="170" height="34" rx="5" fill="#34d39912" stroke="#34d399" stroke-width=".8"/>
+        <text x="605" y="190" fill="#34d399" font-size="10" text-anchor="middle" font-weight="500">ActivationCache</text>
 
-        <!-- HookedVLM -->
-        <rect x="220" y="192" width="150" height="40" rx="6" fill="#06d6a018" stroke="#06d6a0" stroke-width="1"/>
-        <text x="295" y="217" fill="#06d6a0" font-size="11" text-anchor="middle" font-weight="500">HookedVLM</text>
+        <line x1="450" y1="218" x2="450" y2="244" stroke="#2d4270" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <polygon points="446,242 450,250 454,242" fill="#2d4270"/>
 
-        <!-- LensPipeline -->
-        <rect x="390" y="192" width="150" height="40" rx="6" fill="#06d6a018" stroke="#06d6a0" stroke-width="1"/>
-        <text x="465" y="217" fill="#06d6a0" font-size="11" text-anchor="middle" font-weight="500">LensPipeline</text>
+        <!-- Adapters -->
+        <rect x="30" y="260" width="840" height="88" rx="8" fill="#111a2e" stroke="#2d4270" stroke-width="1"/>
+        <text x="50" y="284" fill="#6b82a8" font-size="10" font-weight="600" letter-spacing=".06em">ADAPTER LAYER</text>
+        <rect x="50" y="300" width="170" height="34" rx="6" fill="#34d39912" stroke="#34d399" stroke-width=".8"/>
+        <text x="135" y="322" fill="#34d399" font-size="10" text-anchor="middle" font-weight="500">CLIPAdapter</text>
+        <rect x="240" y="300" width="170" height="34" rx="6" fill="#f0a85812" stroke="#f0a858" stroke-width=".8"/>
+        <text x="325" y="322" fill="#f0a858" font-size="10" text-anchor="middle" font-weight="500">BLIP2Adapter</text>
+        <rect x="430" y="300" width="170" height="34" rx="6" fill="#a78bfa12" stroke="#a78bfa" stroke-width=".8"/>
+        <text x="515" y="322" fill="#a78bfa" font-size="10" text-anchor="middle" font-weight="500">LlavaAdapter</text>
+        <rect x="620" y="300" width="230" height="34" rx="6" fill="#f472b612" stroke="#f472b6" stroke-width=".8"/>
+        <text x="735" y="322" fill="#f472b6" font-size="10" text-anchor="middle" font-weight="500">GenericVLMAdapter</text>
 
-        <!-- ActivationCache -->
-        <rect x="560" y="192" width="180" height="40" rx="6" fill="#06d6a018" stroke="#06d6a0" stroke-width="1"/>
-        <text x="650" y="217" fill="#06d6a0" font-size="11" text-anchor="middle" font-weight="500">ActivationCache</text>
+        <line x1="450" y1="348" x2="450" y2="374" stroke="#2d4270" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <polygon points="446,372 450,380 454,372" fill="#2d4270"/>
 
-        <!-- Arrow down -->
-        <line x1="480" y1="250" x2="480" y2="280" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <polygon points="476,278 480,288 484,278" fill="#334155"/>
-
-        <!-- Adapter Layer -->
-        <rect x="40" y="290" width="880" height="100" rx="10" fill="#111827" stroke="#334155" stroke-width="1"/>
-        <text x="60" y="318" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="0.05em">ADAPTER LAYER — ModelAdapter ABC</text>
-
-        <rect x="60" y="332" width="190" height="44" rx="8" fill="#06d6a018" stroke="#06d6a0" stroke-width="1"/>
-        <text x="155" y="358" fill="#06d6a0" font-size="11" text-anchor="middle" font-weight="500">CLIPAdapter</text>
-
-        <rect x="270" y="332" width="190" height="44" rx="8" fill="#f59e0b18" stroke="#f59e0b" stroke-width="1"/>
-        <text x="365" y="358" fill="#f59e0b" font-size="11" text-anchor="middle" font-weight="500">BLIP2Adapter</text>
-
-        <rect x="480" y="332" width="190" height="44" rx="8" fill="#8b5cf618" stroke="#8b5cf6" stroke-width="1"/>
-        <text x="575" y="358" fill="#8b5cf6" font-size="11" text-anchor="middle" font-weight="500">LlavaAdapter</text>
-
-        <rect x="690" y="332" width="210" height="44" rx="8" fill="#ec489918" stroke="#ec4899" stroke-width="1"/>
-        <text x="795" y="358" fill="#ec4899" font-size="11" text-anchor="middle" font-weight="500">GenericVLMAdapter</text>
-
-        <!-- Arrow down -->
-        <line x1="480" y1="390" x2="480" y2="420" stroke="#334155" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <polygon points="476,418 480,428 484,418" fill="#334155"/>
-
-        <!-- Output Layer -->
-        <rect x="40" y="430" width="880" height="70" rx="10" fill="#111827" stroke="#334155" stroke-width="1"/>
-        <text x="60" y="458" fill="#94a3b8" font-size="11" font-weight="600" letter-spacing="0.05em">NORMALIZED OUTPUT</text>
-
-        <rect x="60" y="470" width="120" height="22" rx="4" fill="#1e293b"/>
-        <text x="120" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">AnalysisResult</text>
-
-        <rect x="200" y="470" width="100" height="22" rx="4" fill="#1e293b"/>
-        <text x="250" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Attention Maps</text>
-
-        <rect x="320" y="470" width="100" height="22" rx="4" fill="#1e293b"/>
-        <text x="370" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Alignment</text>
-
-        <rect x="440" y="470" width="100" height="22" rx="4" fill="#1e293b"/>
-        <text x="490" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Score</text>
-
-        <rect x="560" y="470" width="100" height="22" rx="4" fill="#1e293b"/>
-        <text x="610" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Faithfulness</text>
-
-        <rect x="680" y="470" width="120" height="22" rx="4" fill="#1e293b"/>
-        <text x="740" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Hidden States</text>
-
-        <rect x="820" y="470" width="80" height="22" rx="4" fill="#1e293b"/>
-        <text x="860" y="485" fill="#94a3b8" font-size="10" text-anchor="middle">Logits</text>
+        <!-- Output -->
+        <rect x="30" y="390" width="840" height="64" rx="8" fill="#111a2e" stroke="#2d4270" stroke-width="1"/>
+        <text x="50" y="414" fill="#6b82a8" font-size="10" font-weight="600" letter-spacing=".06em">NORMALIZED OUTPUT</text>
+        <text x="50" y="436" fill="#8da0c0" font-size="10">AnalysisResult</text>
+        <text x="200" y="436" fill="#6b82a8" font-size="10">&bull;</text>
+        <text x="215" y="436" fill="#8da0c0" font-size="10">Attention Maps</text>
+        <text x="350" y="436" fill="#6b82a8" font-size="10">&bull;</text>
+        <text x="365" y="436" fill="#8da0c0" font-size="10">Alignment</text>
+        <text x="465" y="436" fill="#6b82a8" font-size="10">&bull;</text>
+        <text x="480" y="436" fill="#8da0c0" font-size="10">Score</text>
+        <text x="545" y="436" fill="#6b82a8" font-size="10">&bull;</text>
+        <text x="560" y="436" fill="#8da0c0" font-size="10">Faithfulness</text>
+        <text x="690" y="436" fill="#6b82a8" font-size="10">&bull;</text>
+        <text x="705" y="436" fill="#8da0c0" font-size="10">Logits</text>
       </svg>
     </div>
 
-    <!-- Architecture features -->
-    <div class="arch-features">
-      <div class="arch-feature reveal">
-        <h4>
-          <span class="feature-icon" style="background:var(--accent-dim);color:var(--accent)">⚡</span>
-          Adapterized Abstraction
-        </h4>
+    <div class="arch-row">
+      <div class="arch-item sr">
+        <h4>Adapterized Abstraction</h4>
         <p>
-          Four canonical adapters — <code>CLIPAdapter</code>, <code>BLIP2Adapter</code>,
-          <code>LlavaAdapter</code>, <code>GenericVLMAdapter</code> — each implement
-          <code>load()</code>, <code>prepare()</code>, <code>analyze()</code>, and <code>score()</code>.
-          The UI and CLI never see model-specific code.
+          Four canonical adapters each implement <code>load()</code>, <code>prepare()</code>,
+          <code>analyze()</code>, <code>score()</code>. The UI and CLI never see model-specific code.
         </p>
       </div>
-      <div class="arch-feature reveal reveal-delay-1">
-        <h4>
-          <span class="feature-icon" style="background:var(--accent3-dim);color:var(--accent3)">🔗</span>
-          TransformerLens-Style Hooks
-        </h4>
+      <div class="arch-item sr d1">
+        <h4>TransformerLens-Style Hooks</h4>
         <p>
-          Three hook classes — <code>ForwardHookCache</code>, <code>ForwardLayerPatcher</code>,
-          <code>ForwardInputPatcher</code> — built on PyTorch's <code>register_forward_hook</code>.
-          Auto-discovers transformer layer paths by scanning <code>model.named_modules()</code>.
+          Three hook classes built on PyTorch's <code>register_forward_hook</code>.
+          Auto-discovers transformer layers by scanning <code>model.named_modules()</code>.
         </p>
       </div>
-      <div class="arch-feature reveal reveal-delay-2">
-        <h4>
-          <span class="feature-icon" style="background:var(--accent2-dim);color:var(--accent2)">📦</span>
-          Declarative Configs
-        </h4>
+      <div class="arch-item sr d2">
+        <h4>Declarative Configs</h4>
         <p>
-          New VLM families can be added via <code>MultimodalConfig</code> — define the vision tower
-          path, projector path, language model path, and image token string. No custom adapter code
-          needed for simple architectures.
+          New VLM families via <code>MultimodalConfig</code>: define vision tower, projector,
+          language model paths, and image token string. No custom adapter code needed.
         </p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Supported Models -->
-<section class="models" id="models">
+<!-- Models -->
+<section id="models">
   <div class="section-inner">
     <div class="reading">
-      <p class="section-label reveal">Model Support</p>
-      <h2 class="section-title reveal">23 Family Aliases, 4 Adapters</h2>
-      <p class="section-desc reveal">
-        From CLIP's dual encoders to LLaVA's interleaved decoder, MultimodalLens unifies
-        the landscape with auto-inference from HuggingFace configs.
+      <h2 class="section-title sr">23 Family Aliases, 4 Adapters</h2>
+      <p class="section-desc sr">
+        From CLIP's dual encoders to LLaVA's interleaved decoder, MultimodalLens
+        unifies the landscape with auto-inference from Hugging Face configs.
       </p>
     </div>
 
     <div class="model-grid">
-      <!-- CLIP family -->
-      <div class="model-card clip reveal">
-        <h3>
-          CLIP &amp; Friends
-          <span class="adapter-badge">CLIPAdapter</span>
-        </h3>
-        <p class="families">
-          Dual-encoder architecture with independent vision and text towers.
-          Direct cosine similarity scoring.
-        </p>
-        <div class="checkpoints">
-          openai/clip-vit-base-patch32<br>
-          google/siglip-base-patch16-224<br>
-          ydshieh/vit-gpt2-coco-en
-        </div>
-        <div style="margin-top:.75rem">
-          <span style="font-size:.75rem;color:var(--text-dim)">Aliases: </span>
-          <span style="font-size:.75rem;color:var(--text-muted)">clip, siglip, siglip2, altclip, xclip, chinese_clip</span>
-        </div>
-        <div class="status status-pass">✓ Validated</div>
+      <div class="model-card c-clip sr">
+        <h3>CLIP &amp; Friends <span class="badge">CLIPAdapter</span></h3>
+        <p class="desc">Dual-encoder architecture with independent vision and text towers. Direct cosine similarity scoring.</p>
+        <div class="code">openai/clip-vit-base-patch32<br>google/siglip-base-patch16-224</div>
+        <div class="aliases">Aliases: <span>clip, siglip, siglip2, altclip, xclip, chinese_clip</span></div>
+        <div class="status s-pass">Validated</div>
       </div>
-
-      <!-- BLIP-2 family -->
-      <div class="model-card blip reveal reveal-delay-1">
-        <h3>
-          BLIP-2 &amp; InstructBLIP
-          <span class="adapter-badge">BLIP2Adapter</span>
-        </h3>
-        <p class="families">
-          Q-Former bridges frozen vision encoder to frozen LLM.
-          Cross-attention extraction for grounding analysis.
-        </p>
-        <div class="checkpoints">
-          Salesforce/blip2-opt-2.7b<br>
-          Salesforce/instructblip-vicuna-7b
-        </div>
-        <div style="margin-top:.75rem">
-          <span style="font-size:.75rem;color:var(--text-dim)">Aliases: </span>
-          <span style="font-size:.75rem;color:var(--text-muted)">blip2, blip_2, instructblip, instruct_blip</span>
-        </div>
-        <div class="status status-partial">◐ Partial</div>
+      <div class="model-card c-blip sr d1">
+        <h3>BLIP-2 &amp; InstructBLIP <span class="badge">BLIP2Adapter</span></h3>
+        <p class="desc">Q-Former bridges frozen vision encoder to frozen LLM. Cross-attention extraction for grounding analysis.</p>
+        <div class="code">Salesforce/blip2-opt-2.7b<br>Salesforce/instructblip-vicuna-7b</div>
+        <div class="aliases">Aliases: <span>blip2, blip_2, instructblip, instruct_blip</span></div>
+        <div class="status s-partial">Partial</div>
       </div>
-
-      <!-- LLaVA family -->
-      <div class="model-card llava reveal">
-        <h3>
-          LLaVA &amp; Decoder VLMs
-          <span class="adapter-badge">LlavaAdapter</span>
-        </h3>
-        <p class="families">
-          Interleaved image tokens in autoregressive decoder.
-          Multiple fallback strategies for hidden-state segmentation.
-        </p>
-        <div class="checkpoints">
-          llava-hf/llava-1.5-7b-hf<br>
-          meta-llama/Llama-3.2-11B-Vision-Instruct<br>
-          Qwen/Qwen2-VL-2B-Instruct
-        </div>
-        <div style="margin-top:.75rem">
-          <span style="font-size:.75rem;color:var(--text-dim)">Aliases: </span>
-          <span style="font-size:.75rem;color:var(--text-muted)">llava, llava_next, llava_onevision, qwen2_vl, qwen2_5_vl, mllama, internvl, minicpmv, smolvlm, kosmos2, florence2</span>
-        </div>
-        <div class="status status-partial">◐ Partial</div>
+      <div class="model-card c-llava sr">
+        <h3>LLaVA &amp; Decoder VLMs <span class="badge">LlavaAdapter</span></h3>
+        <p class="desc">Interleaved image tokens in autoregressive decoder. Multiple fallback strategies for hidden-state segmentation.</p>
+        <div class="code">llava-hf/llava-1.5-7b-hf<br>meta-llama/Llama-3.2-11B-Vision<br>Qwen/Qwen2-VL-2B-Instruct</div>
+        <div class="aliases">Aliases: <span>llava, llava_next, qwen2_vl, qwen2_5_vl, mllama, internvl, minicpmv, smolvlm, kosmos2, florence2</span></div>
+        <div class="status s-partial">Partial</div>
       </div>
-
-      <!-- Generic -->
-      <div class="model-card generic reveal reveal-delay-1">
-        <h3>
-          Generic VLMs
-          <span class="adapter-badge">GenericVLMAdapter</span>
-        </h3>
-        <p class="families">
-          Config-driven universal adapter for architectures that don't fit
-          canonical patterns. Uses <code>MultimodalConfig</code> for routing.
-        </p>
-        <div class="checkpoints">
-          HuggingFaceM4/idefics2-8b<br>
-          google/paligemma-3b-mix-224<br>
-          mistralai/Pixtral-12B-2409
-        </div>
-        <div style="margin-top:.75rem">
-          <span style="font-size:.75rem;color:var(--text-dim)">Aliases: </span>
-          <span style="font-size:.75rem;color:var(--text-muted)">idefics2, idefics3, paligemma, pixtral</span>
-        </div>
-        <div class="status status-experimental">○ Experimental</div>
+      <div class="model-card c-gen sr d1">
+        <h3>Generic VLMs <span class="badge">GenericVLMAdapter</span></h3>
+        <p class="desc">Config-driven universal adapter for architectures that don't fit canonical patterns.</p>
+        <div class="code">HuggingFaceM4/idefics2-8b<br>google/paligemma-3b-mix-224<br>mistralai/Pixtral-12B-2409</div>
+        <div class="aliases">Aliases: <span>idefics2, idefics3, paligemma, pixtral</span></div>
+        <div class="status s-exp">Experimental</div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- Capabilities -->
-<section class="capabilities" id="capabilities">
+<!-- Capabilities — no numbers, grouped -->
+<section class="arch-section" id="capabilities">
   <div class="section-inner">
     <div class="reading">
-      <p class="section-label reveal">Capabilities</p>
-      <h2 class="section-title reveal">What MultimodalLens Can Do</h2>
-      <p class="section-desc reveal">
-        From attention heatmaps to causal path patching — a complete mechanistic
-        interpretability toolkit for the multimodal era.
+      <h2 class="section-title sr">What MultimodalLens Can Do</h2>
+      <p class="section-desc sr">
+        From attention heatmaps to causal path patching. A mechanistic interpretability
+        toolkit, not a visualization dashboard.
       </p>
     </div>
 
     <div class="cap-grid">
-      <div class="cap-card reveal">
-        <div class="cap-num">01</div>
+      <div class="cap-card sr">
         <h3>Attention Rollout &amp; Overlays</h3>
         <p>
           Residual-augmented rollout across all layers: <code>A'_l = normalize(A_l + I)</code>,
-          then <code>R = A'_L · A'_{L-1} · ... · A'_1</code>. Reshaped to patch grids and
-          overlaid as heatmaps on input images. Also supports last-layer mean-head views and
-          gradient attribution maps.
+          then <code>R = A'_L * A'_{L-1} * ... * A'_1</code>. Reshaped to patch grids and
+          overlaid as heatmaps on input images.
         </p>
       </div>
-
-      <div class="cap-card reveal reveal-delay-1">
-        <div class="cap-num">02</div>
+      <div class="cap-card sr d1">
         <h3>Token-Patch Alignment</h3>
         <p>
           Cross-modal cosine similarity matrices between text tokens and visual patches
-          in shared embedding space. <code>S_ij = cos(t_i, v_j)</code> — shown as
-          token-by-patch heatmaps with per-token saliency scores.
+          in shared embedding space. <code>S_ij = cos(t_i, v_j)</code> with per-token saliency.
         </p>
       </div>
-
-      <div class="cap-card reveal">
-        <div class="cap-num">03</div>
+      <div class="cap-card sr">
         <h3>Multimodal Logit Lens</h3>
         <p>
-          Decode intermediate hidden states through <code>lm_head</code> layer-by-layer,
-          yielding a trajectory of what the model "believes" before final decoding.
-          Three-stage vision logit lens for pre-projector, post-projector, and
-          language layer analysis.
+          Decode intermediate hidden states through <code>lm_head</code> layer-by-layer.
+          Three-stage vision logit lens for pre-projector, post-projector, and language layer analysis.
         </p>
       </div>
-
-      <div class="cap-card reveal reveal-delay-1">
-        <div class="cap-num">04</div>
+      <div class="cap-card sr d1">
         <h3>Cross-Modal Activation Patching</h3>
         <p>
-          Causal tracing by swapping activations between source and target images
-          at a selected layer. If replacing visual-token positions changes the output
-          score, that layer carries causal visual evidence for text generation.
+          Causal tracing by swapping activations between source and target images at a selected layer.
+          If replacing visual-token positions changes the output, that layer carries causal evidence.
         </p>
       </div>
-
-      <div class="cap-card reveal">
-        <div class="cap-num">05</div>
+      <div class="cap-card sr">
         <h3>Grounding Head Discovery</h3>
         <p>
-          Identify specific attention heads responsible for visual grounding via
-          ablation sensitivity analysis. Ranks heads by <code>|Δ_visual_mass| × (1 + max(score_drop, 0))</code>
-          — the candidates behind image-conditioned reasoning.
+          Identify attention heads responsible for visual grounding via ablation sensitivity.
+          Ranks heads by <code>|delta_visual_mass| * (1 + max(score_drop, 0))</code>.
         </p>
       </div>
-
-      <div class="cap-card reveal reveal-delay-1">
-        <div class="cap-num">06</div>
+      <div class="cap-card sr d1">
         <h3>Faithfulness Diagnostics</h3>
         <p>
-          Because attention is not explanation. Deletion/insertion curves,
-          counterfactual masking drops, and attention-gradient Spearman correlation
-          verify whether your heatmaps actually reflect causal importance.
+          Attention is not explanation. Deletion/insertion curves, counterfactual masking, and
+          attention-gradient Spearman correlation verify whether heatmaps reflect causal importance.
         </p>
       </div>
-
-      <div class="cap-card reveal">
-        <div class="cap-num">07</div>
+      <div class="cap-card sr">
         <h3>Direct Logit Attribution</h3>
         <p>
-          Decompose target token logit into per-head, per-MLP, and embedding
-          contributions. Interactive waterfall visualization showing exactly which
-          components push the model toward its prediction.
+          Decompose target token logit into per-head, per-MLP, and embedding contributions.
+          Interactive waterfall visualization of exactly which components push the prediction.
         </p>
       </div>
-
-      <div class="cap-card reveal reveal-delay-1">
-        <div class="cap-num">08</div>
+      <div class="cap-card sr d1">
         <h3>Causal Path Patching</h3>
         <p>
-          Edge-level intervention analysis between sender and receiver components
-          across Q/K/V channels. Maps the full causal graph of information flow
-          through the model's attention and MLP layers.
+          Edge-level intervention analysis between sender and receiver components across Q/K/V channels.
+          Maps the full causal graph of information flow through the model.
         </p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- How It Works — Pipeline -->
-<section class="pipeline" id="pipeline">
+<!-- Pipeline -->
+<section id="pipeline">
   <div class="section-inner">
     <div class="reading" style="text-align:center">
-      <p class="section-label reveal">Pipeline</p>
-      <h2 class="section-title reveal">How MultimodalLens Works</h2>
-      <p class="section-desc reveal" style="margin:0 auto">
-        From raw image and text to causal insights — a five-stage pipeline.
+      <h2 class="section-title sr">How It Works</h2>
+      <p class="section-desc sr" style="margin:0 auto">
+        From raw image and text to causal insights.
       </p>
     </div>
 
-    <div class="pipeline-flow reveal">
-      <div class="pipeline-step">
-        <div class="step-num">01 — INPUT</div>
-        <h4>Image + Text</h4>
-        <p>PIL image and prompt string enter the system. AutoProcessor tokenizes text and preprocesses images into model-ready tensors.</p>
+    <div class="pipeline-flow sr">
+      <div class="p-step">
+        <h4>Input</h4>
+        <p>PIL image and prompt string. AutoProcessor tokenizes text and preprocesses images into model-ready tensors.</p>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">02 — ADAPTER</div>
-        <h4>Model-Specific Routing</h4>
-        <p>Family resolution picks the right adapter. CLIP extracts dual towers, BLIP-2 routes through Q-Former, LLaVA segments decoder hidden states.</p>
+      <div class="p-step">
+        <h4>Route</h4>
+        <p>Family resolution picks the right adapter. CLIP extracts dual towers, BLIP-2 routes through Q-Former, LLaVA segments decoder states.</p>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">03 — FORWARD</div>
-        <h4>Hooked Forward Pass</h4>
-        <p>Model runs with <code>output_attentions=True</code>, <code>output_hidden_states=True</code>. Forward hooks capture per-layer activations without modifying the model.</p>
+      <div class="p-step">
+        <h4>Forward</h4>
+        <p>Model runs with attentions and hidden states enabled. Forward hooks capture per-layer activations without modifying the model.</p>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">04 — ANALYZE</div>
-        <h4>Multi-Signal Extraction</h4>
-        <p>Attention rollout, token-patch alignment, gradient attribution, faithfulness probes, and mechanistic analysis run in parallel on cached activations.</p>
+      <div class="p-step">
+        <h4>Analyze</h4>
+        <p>Attention rollout, alignment, gradients, faithfulness probes, and mechanistic analysis run on cached activations.</p>
       </div>
-      <div class="pipeline-step">
-        <div class="step-num">05 — OUTPUT</div>
-        <h4>Normalized Results</h4>
-        <p>All adapters produce a unified <code>AnalysisResult</code> — heatmaps, matrices, scores, faithfulness metrics, ready for UI display or batch export.</p>
+      <div class="p-step">
+        <h4>Output</h4>
+        <p>Unified AnalysisResult: heatmaps, matrices, scores, faithfulness metrics. Ready for UI display or batch export.</p>
       </div>
     </div>
 
-    <!-- Quick start code -->
-    <div class="code-block reveal" style="max-width:750px;margin:3rem auto">
-      <div class="code-header">
-        <div class="code-dots"><i></i><i></i><i></i></div>
+    <div class="code-block sr" style="max-width:680px;margin:2.5rem auto">
+      <div class="code-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
         <span>quickstart.py</span>
       </div>
       <pre class="code-body"><span class="kw">from</span> multimodallens <span class="kw">import</span> <span class="fn">HookedVLM</span>
@@ -933,68 +778,62 @@ footer a:hover{text-decoration:underline}
 <span class="cmt"># Load any supported VLM in one line</span>
 vlm <span class="op">=</span> <span class="fn">HookedVLM</span>.<span class="fn">from_pretrained</span>(<span class="str">"openai/clip-vit-base-patch32"</span>, device<span class="op">=</span><span class="str">"auto"</span>)
 
-<span class="cmt"># Run with cache — get logits, scores, and all internal layer activations</span>
+<span class="cmt"># Run with cache</span>
 result, cache <span class="op">=</span> vlm.<span class="fn">run_with_cache</span>(<span class="fn">Image</span>.<span class="fn">open</span>(<span class="str">"cat.jpg"</span>), <span class="str">"a photo of a cat"</span>)
 
-<span class="cmt"># Access any activation by layer name</span>
+<span class="cmt"># Access activation by layer name</span>
 layer_5 <span class="op">=</span> cache[<span class="str">"vision_encoder.layers.5"</span>]
 
 <span class="cmt"># Zero-ablate a layer on the fly</span>
 patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
     image<span class="op">=</span><span class="fn">Image</span>.<span class="fn">open</span>(<span class="str">"cat.jpg"</span>),
     prompt<span class="op">=</span><span class="str">"a photo of a cat"</span>,
-    fwd_hooks<span class="op"></span><span class="op">=</span>[(<span class="str">"vision_encoder.layers.5"</span>, <span class="kw">lambda</span> t: t <span class="op">*</span> <span class="str">0.0</span>)]
+    fwd_hooks<span class="op">=</span>[(<span class="str">"vision_encoder.layers.5"</span>, <span class="kw">lambda</span> t: t <span class="op">*</span> <span class="str">0.0</span>)]
 )</pre>
     </div>
   </div>
 </section>
 
 <!-- Methodology -->
-<section class="methodology" id="methodology">
+<section class="arch-section" id="methodology">
   <div class="section-inner">
     <div class="reading">
-      <p class="section-label reveal">Methodology</p>
-      <h2 class="section-title reveal">The Science Behind the Lens</h2>
-      <p class="section-desc reveal">
-        MultimodalLens combines three complementary evidence channels to avoid
-        over-reliance on any single explanation primitive.
+      <h2 class="section-title sr">The Science Behind the Lens</h2>
+      <p class="section-desc sr">
+        Three complementary evidence channels. No single explanation primitive.
       </p>
     </div>
 
     <div class="method-grid">
-      <div class="method-block reveal">
-        <h3>🔍 Structural Signal — Attention</h3>
+      <div class="method-block sr">
+        <h3>Structural Signal: Attention</h3>
         <div class="math">
-          A'<sub>l</sub> = normalize(A<sub>l</sub> + I)<br>
-          R = A'<sub>L</sub> · A'<sub>L-1</sub> · ... · A'<sub>1</sub>
+          A'_l = normalize(A_l + I)<br>
+          R = A'_L * A'_{L-1} * ... * A'_1
         </div>
         <p>
           Residual-augmented rollout propagates attention through all layers while
-          accounting for skip connections. The resulting matrix R captures each
-          token's total attention to every image patch across the full depth of
-          the network.
+          accounting for skip connections. The resulting matrix captures each token's
+          total attention to every image patch across the full network depth.
         </p>
       </div>
-
-      <div class="method-block reveal reveal-delay-1">
-        <h3>🧬 Representation Signal — Alignment</h3>
+      <div class="method-block sr d1">
+        <h3>Representation Signal: Alignment</h3>
         <div class="math">
-          S<sub>ij</sub> = cos(t<sub>i</sub>, v<sub>j</sub>)<br>
-          salience<sub>i</sub> = max<sub>j</sub> S<sub>ij</sub>
+          S_ij = cos(t_i, v_j)<br>
+          salience_i = max_j S_ij
         </div>
         <p>
           Token-patch cosine similarity in shared latent space reveals which text
-          tokens are most aligned with which visual patches. The alignment matrix S
-          and per-token saliency scores expose cross-modal grounding.
+          tokens align with which visual patches. The alignment matrix and per-token
+          saliency scores expose cross-modal grounding.
         </p>
       </div>
-
-      <div class="method-block reveal">
-        <h3>🧪 Causal Signal — Faithfulness</h3>
+      <div class="method-block sr">
+        <h3>Causal Signal: Faithfulness</h3>
         <div class="math">
-          Deletion: mask top-ranked patches, track Δscore<br>
+          Deletion: mask top-ranked patches, track delta_score<br>
           Insertion: preserve top patches, track score recovery<br>
-          Counterfactual: single-step top-k% masking effect<br>
           Agreement: Spearman(attn, gradient)
         </div>
         <p>
@@ -1003,151 +842,105 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
           whether attention maps reflect genuine causal importance.
         </p>
       </div>
-
-      <div class="method-block reveal reveal-delay-1">
-        <h3>🔬 Mechanistic Probes</h3>
+      <div class="method-block sr d1">
+        <h3>Mechanistic Probes</h3>
         <div class="math">
-          Forward Hook → Capture → Decode/Project → Analyze<br><br>
-          Logit Lens: hidden_state @ lm_head → vocab<br>
-          Path Patching: sender → receiver edge effects<br>
-          DLA: per-head + per-MLP logit decomposition
+          Hook &rarr; Capture &rarr; Decode/Project &rarr; Analyze<br><br>
+          Logit Lens: hidden_state @ lm_head &rarr; vocab<br>
+          Path Patching: sender &rarr; receiver edge effects
         </div>
         <p>
-          TransformerLens-style probes — forward-hook activation caching, cross-modal
+          TransformerLens-style probes: forward-hook activation caching, cross-modal
           activation patching, multimodal logit lens, grounding head discovery,
           direct logit attribution, and causal path patching.
         </p>
       </div>
     </div>
 
-    <!-- Diagnostic Tuple -->
-    <div class="reading reveal" style="margin-top:3rem">
-      <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2rem;text-align:center">
-        <p style="font-family:var(--font-mono);font-size:.75rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem">The Diagnostic Tuple</p>
-        <p style="font-family:var(--font-mono);font-size:1.3rem;color:var(--accent);margin-bottom:1rem">
-          D = (A, S, g, F)
-        </p>
-        <p style="font-size:.9rem;color:var(--text-muted);max-width:550px;margin:0 auto;line-height:1.7">
-          For every <code style="color:var(--accent3)">(image, prompt)</code> pair, MultimodalLens produces
-          <strong style="color:var(--text)">A</strong> (attention maps),
-          <strong style="color:var(--text)">S</strong> (alignment matrix),
-          <strong style="color:var(--text)">g</strong> (global score), and
-          <strong style="color:var(--text)">F</strong> (faithfulness metrics) —
-          four convergent signals for robust model debugging.
-        </p>
-      </div>
+    <div class="tuple-box sr">
+      <p style="font-family:var(--font-mono);font-size:.7rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em">The Diagnostic Tuple</p>
+      <p class="formula">D = (A, S, g, F)</p>
+      <p>
+        For every <code style="color:var(--violet);font-family:var(--font-mono);font-size:.85rem">(image, prompt)</code> pair,
+        MultimodalLens produces <strong style="color:var(--text)">A</strong> (attention maps),
+        <strong style="color:var(--text)">S</strong> (alignment matrix),
+        <strong style="color:var(--text)">g</strong> (global score), and
+        <strong style="color:var(--text)">F</strong> (faithfulness metrics).
+        Four convergent signals for robust model debugging.
+      </p>
     </div>
   </div>
 </section>
 
-<!-- All Features -->
-<section style="background:var(--bg)">
-  <div class="section-inner">
-    <div class="reading" style="text-align:center">
-      <p class="section-label reveal">Everything Included</p>
-      <h2 class="section-title reveal">Complete Feature Set</h2>
-    </div>
-
-    <div class="features-list reveal">
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>HookedVLM</strong> — TransformerLens-style programmatic API</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>ActivationCache</strong> — dict-like container with glob patterns</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Attention Rollout</strong> — residual-augmented multi-layer rollout</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Token-Patch Alignment</strong> — cosine similarity heatmaps</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Gradient Attribution</strong> — backprop to visual hidden states</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Logit Lens</strong> — layer-by-layer vocabulary decoding</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Vision Logit Lens</strong> — 3-stage pre/post projector analysis</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Activation Patching</strong> — cross-modal causal tracing</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Grounding Head Discovery</strong> — ablation-based head ranking</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Direct Logit Attribution</strong> — per-head/MLP decomposition</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Path Patching</strong> — edge-level causal intervention</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>FactoredMatrix</strong> — efficient OV/QK circuit analysis</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>LayerNorm Folding</strong> — absorb LN into adjacent weights</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Weight Centering</strong> — writing weights + unembedding centering</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Deletion/Insertion Curves</strong> — progressive perturbation</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Counterfactual Drop</strong> — single-shot masking impact</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Spearman Agreement</strong> — attention vs gradient rank correlation</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Gradio Web UI</strong> — Explore, Compare, and Eval tabs</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>CLI Tools</strong> — analyze, preflight, eval, version commands</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Interactive HTML</strong> — DLA waterfall + path patching dashboards</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Batch Evaluation</strong> — JSONL datasets with per-sample metrics</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Download Bundles</strong> — ZIP export with plots, CSVs, JSON, activations</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>Preflight Checks</strong> — model compatibility before heavy execution</span></div>
-      <div class="feature-item"><div class="feature-check">✓</div><span><strong>20+ Model Families</strong> — auto-inference from HF AutoConfig</span></div>
-    </div>
-  </div>
-</section>
-
-<!-- CTA / Install -->
-<section style="background:var(--surface);padding:5rem 2rem">
+<!-- Install CTA -->
+<section style="padding:4rem 2rem">
   <div class="section-inner" style="text-align:center">
-    <p class="section-label reveal">Get Started</p>
-    <h2 class="section-title reveal" style="font-size:clamp(2rem,4vw,2.8rem)">Start Looking Inside Your Models</h2>
-    <p class="section-desc reveal" style="margin:0 auto 2.5rem;text-align:center">
-      One pip install. One line of code. Full visibility into how your VLM processes the world.
-    </p>
-
-    <div class="code-block reveal" style="max-width:500px;margin:0 auto 2rem">
-      <div class="code-header">
-        <div class="code-dots"><i></i><i></i><i></i></div>
-        <span>terminal</span>
-      </div>
+    <h2 class="section-title sr" style="font-size:clamp(1.6rem,3vw,2.2rem)">Start looking inside your models</h2>
+    <div class="code-block sr" style="max-width:380px;margin:1.5rem auto">
+      <div class="code-bar"><div class="dots"><i></i><i></i><i></i></div><span>terminal</span></div>
       <pre class="code-body" style="text-align:center"><span class="fn">pip</span> <span class="str">install multimodallens</span></pre>
     </div>
-
-    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap" class="reveal">
-      <a href="https://pypi.org/project/multimodallens/" class="btn btn-primary" target="_blank" rel="noopener">PyPI →</a>
-      <a href="https://github.com/AKHegde22/Papers-C" class="btn btn-ghost" target="_blank" rel="noopener">GitHub →</a>
-      <a href="Main_Demo.ipynb" class="btn btn-ghost">Notebook Demo →</a>
+    <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap" class="sr">
+      <a href="https://pypi.org/project/multimodallens/" class="btn btn-primary" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/AKHegde22/MultiModal-Lens" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+      <a href="Main_Demo.ipynb" class="btn btn-ghost">Notebook Demo</a>
     </div>
   </div>
 </section>
 
-<!-- Footer -->
+</main>
+
 <footer>
-  <div class="footer-links">
-    <a href="https://github.com/AKHegde22/Papers-C">GitHub</a>
+  <div class="f-links">
+    <a href="https://github.com/AKHegde22/MultiModal-Lens">GitHub</a>
     <a href="https://pypi.org/project/multimodallens/">PyPI</a>
     <a href="docs/methodology.md">Methodology</a>
-    <a href="docs/research_paper_draft.md">Paper Draft</a>
+    <a href="docs/research_paper_draft.md">Paper</a>
     <a href="CONTRIBUTING.md">Contributing</a>
     <a href="CHANGELOG.md">Changelog</a>
   </div>
-  <p>
-    MultiModal-Lens is released under the <a href="LICENSE">MIT License</a>.<br>
-    Built with care for the VLM interpretability community.
-  </p>
+  <p>MultiModal-Lens is released under the <a href="LICENSE">MIT License</a>.</p>
 </footer>
 
 <script>
-// Nav scroll effect
-const nav = document.getElementById('nav');
-let lastScroll = 0;
-window.addEventListener('scroll', () => {
-  nav.classList.toggle('scrolled', window.scrollY > 60);
-}, { passive: true });
+// Nav scroll
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>50)},{passive:true});
 
-// Scroll reveal
-const reveals = document.querySelectorAll('.reveal');
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-    }
-  });
-}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-reveals.forEach(el => observer.observe(el));
+// Mobile menu
+const hamburger=document.querySelector('.hamburger');
+const mobileMenu=document.querySelector('.mobile-menu');
+hamburger.addEventListener('click',()=>{
+  const open=hamburger.classList.toggle('open');
+  mobileMenu.classList.toggle('open',open);
+  hamburger.setAttribute('aria-expanded',open);
+});
+mobileMenu.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
+  hamburger.classList.remove('open');
+  mobileMenu.classList.remove('open');
+  hamburger.setAttribute('aria-expanded','false');
+}));
 
-// Smooth scroll for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(a => {
-  a.addEventListener('click', e => {
+// Scroll reveal — varied animations
+const prefersReduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(!prefersReduced){
+  const els=document.querySelectorAll('.sr,.sr-left,.sr-scale');
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')});
+  },{threshold:.1,rootMargin:'0px 0px -30px 0px'});
+  els.forEach(el=>obs.observe(el));
+}else{
+  document.querySelectorAll('.sr,.sr-left,.sr-scale').forEach(el=>el.classList.add('v'));
+}
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
     e.preventDefault();
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
   });
 });
 </script>
-
 </body>
 </html>
