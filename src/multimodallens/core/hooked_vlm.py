@@ -11,9 +11,9 @@ from multimodallens.analysis.hooking import list_hookable_layers
 from multimodallens.core.activation_cache import ActivationCache
 from multimodallens.core.hooks import ForwardHookCache, ForwardLayerPatcher
 from multimodallens.core.registry import create_adapter
-from multimodallens.analysis.dla import DLAResult, run_multimodal_dla
-from multimodallens.analysis.logit_lens import LogitLensResult, run_multimodal_logit_lens, run_vision_logit_lens
-from multimodallens.analysis.path_patching import PathPatchingResult, run_causal_path_patching
+from multimodallens.analysis.dla import DLAResult, HeadContribution, MLPContribution, run_multimodal_dla
+from multimodallens.analysis.logit_lens import LogitLensResult, VisionLogitLensResult, run_multimodal_logit_lens, run_vision_logit_lens
+from multimodallens.analysis.path_patching import PathPatchingResult, EdgeEffect, run_causal_path_patching
 from multimodallens.types import AnalysisResult
 
 
@@ -186,6 +186,7 @@ class HookedVLM:
         corrupted_prompt: str,
         sender_layers: list[str] | None = None,
         receiver_layers: list[str] | None = None,
+        receiver_channels: list[str] | None = None,
     ) -> PathPatchingResult:
         """Run Causal Path Patching from sender components to receiver components."""
         return run_causal_path_patching(
@@ -221,7 +222,7 @@ class HookedVLM:
         image: Image.Image,
         layer_names: list[str] | None = None,
         top_k: int = 5,
-    ) -> LogitLensResult:
+    ) -> VisionLogitLensResult:
         """Decode vision tower patch activations into language vocabulary."""
         return run_vision_logit_lens(
             adapter=self._adapter,
@@ -229,4 +230,31 @@ class HookedVLM:
             layer_names=layer_names,
             top_k=top_k,
         )
+
+    def fold_layer_norms(self) -> None:
+        """Fold LayerNorm parameters into adjacent weights for exact decomposition."""
+        from multimodallens.core.weight_processing import fold_layer_norms
+        fold_layer_norms(self.model)
+
+    def center_writing_weights(self) -> None:
+        """Center residual-writing weights for cleaner DLA."""
+        from multimodallens.core.weight_processing import center_writing_weights
+        center_writing_weights(self.model)
+
+    def center_unembed(self) -> None:
+        """Center unembedding matrix for cleaner logit attribution."""
+        from multimodallens.core.weight_processing import center_unembed
+        center_unembed(self.model)
+
+    def ov_circuit(self, layer: int, head: int) -> 'FactoredMatrix':
+        """Get the OV circuit for a specific attention head."""
+        from multimodallens.core.factored_matrix import FactoredMatrix
+        # Find W_V and W_O for this layer/head
+        return FactoredMatrix(None, None)  # Placeholder
+
+    def qk_circuit(self, layer: int, head: int) -> 'FactoredMatrix':
+        """Get the QK circuit for a specific attention head."""
+        from multimodallens.core.factored_matrix import FactoredMatrix
+        # Find W_Q and W_K for this layer/head
+        return FactoredMatrix(None, None)  # Placeholder
 

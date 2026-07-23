@@ -32,7 +32,8 @@ dependencies = [
   "pandas>=2.0.0",
   "scipy>=1.11.0",
   "einops>=0.8.0",
-  "safetensors>=0.4.0"
+  "safetensors>=0.4.0",
+  "plotly>=5.0.0"
 ]
 
 [project.scripts]

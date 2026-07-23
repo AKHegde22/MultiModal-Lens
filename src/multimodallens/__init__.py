@@ -22,8 +22,18 @@ __all__ = [
     "ActivationPatchResult",
     "LogitLensResult",
     "LogitLensStep",
+    "VisionLogitLensResult",
+    "VisionLogitLensStep",
     "GroundingCircuitResult",
     "GroundingHeadScore",
+    "HeadContribution",
+    "MLPContribution",
+    "EdgeEffect",
+    "FactoredMatrix",
+    "fold_layer_norms",
+    "center_writing_weights",
+    "center_unembed",
+    "ForwardInputPatcher",
     "MultimodalLensError",
     "ModelLoadError",
     "UnsupportedFamilyError",
@@ -34,12 +44,15 @@ __all__ = [
 
 if TYPE_CHECKING:
     from multimodallens.adapters.generic_adapter import GenericVLMAdapter
-    from multimodallens.analysis.dla import DLAResult
-    from multimodallens.analysis.path_patching import PathPatchingResult
+    from multimodallens.analysis.dla import DLAResult, HeadContribution, MLPContribution
+    from multimodallens.analysis.path_patching import PathPatchingResult, EdgeEffect
     from multimodallens.core.activation_cache import ActivationCache
     from multimodallens.core.config_schema import MultimodalConfig
     from multimodallens.core.hooked_vlm import HookedVLM
     from multimodallens.core.pipeline import LensPipeline
+    from multimodallens.core.factored_matrix import FactoredMatrix
+    from multimodallens.core.weight_processing import fold_layer_norms, center_writing_weights, center_unembed
+    from multimodallens.core.hooks import ForwardInputPatcher
     from multimodallens.exceptions import (
         AdapterError,
         AnalysisError,
@@ -58,6 +71,8 @@ if TYPE_CHECKING:
         LayerActivationRun,
         LogitLensResult,
         LogitLensStep,
+        VisionLogitLensResult,
+        VisionLogitLensStep,
     )
 
 
@@ -83,14 +98,26 @@ def __getattr__(name: str) -> Any:
         from multimodallens.adapters.generic_adapter import GenericVLMAdapter
 
         return GenericVLMAdapter
-    if name == "DLAResult":
-        from multimodallens.analysis.dla import DLAResult
+    if name in ("DLAResult", "HeadContribution", "MLPContribution"):
+        import multimodallens.analysis.dla as dla
 
-        return DLAResult
-    if name == "PathPatchingResult":
-        from multimodallens.analysis.path_patching import PathPatchingResult
+        return getattr(dla, name)
+    if name in ("PathPatchingResult", "EdgeEffect"):
+        import multimodallens.analysis.path_patching as path_patching
 
-        return PathPatchingResult
+        return getattr(path_patching, name)
+    if name == "FactoredMatrix":
+        from multimodallens.core.factored_matrix import FactoredMatrix
+
+        return FactoredMatrix
+    if name in ("fold_layer_norms", "center_writing_weights", "center_unembed"):
+        import multimodallens.core.weight_processing as weight_processing
+
+        return getattr(weight_processing, name)
+    if name == "ForwardInputPatcher":
+        from multimodallens.core.hooks import ForwardInputPatcher
+
+        return ForwardInputPatcher
     if name in (
         "AnalysisResult",
         "FaithfulnessMetrics",
@@ -99,6 +126,8 @@ def __getattr__(name: str) -> Any:
         "ActivationPatchResult",
         "LogitLensResult",
         "LogitLensStep",
+        "VisionLogitLensResult",
+        "VisionLogitLensStep",
         "GroundingCircuitResult",
         "GroundingHeadScore",
     ):

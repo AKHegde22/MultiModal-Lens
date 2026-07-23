@@ -11,6 +11,22 @@ from multimodallens.adapters.base import ModelAdapter
 from multimodallens.analysis.hooking import list_hookable_layers
 from multimodallens.core.hooks import ForwardHookCache
 from multimodallens.types import LogitLensResult, LogitLensStep
+from dataclasses import dataclass
+
+@dataclass
+class VisionLogitLensStep:
+    layer_name: str
+    position: int
+    top_tokens: list[str]
+    top_probabilities: list[float]
+    stage: str
+    patch_index: int | None = None
+
+@dataclass 
+class VisionLogitLensResult:
+    model_family: str
+    model_name: str
+    stages: dict[str, list[VisionLogitLensStep]]
 
 
 def _forward_adapter(adapter: ModelAdapter, model_inputs: dict[str, Any], requires_grad: bool = False) -> Any:
@@ -230,15 +246,136 @@ def run_vision_logit_lens(
     image: Image.Image,
     layer_names: list[str] | None = None,
     top_k: int = 5,
-) -> LogitLensResult:
-    """Decode vision encoder patch representations into text vocabulary space."""
-    patterns = [r"vision", r"visual", r"encoder"]
-    return run_multimodal_logit_lens(
-        adapter=adapter,
-        image=image,
-        prompt="[VISION_LOGIT_LENS]",
-        layer_names=layer_names,
-        include_patterns=patterns,
-        positions=[0, -1],
-        top_k=top_k,
+) -> VisionLogitLensResult:
+    """Implement 3-stage vision logit lens."""
+    adapter.ensure_loaded()
+    assert adapter.model is not None
+
+    unembed = _get_unembedding(adapter)
+    embed_table = _get_embedding_table(adapter)
+    if unembed is None and embed_table is None:
+        raise RuntimeError("No embeddings found for decoding.")
+
+    all_layers = list_hookable_layers(adapter)
+    
+    vision_patterns = [r"vision", r"visual", r"encoder"]
+    pre_proj_layers = []
+    for l in all_layers:
+        if any(p in l.lower() for p in vision_patterns):
+            pre_proj_layers.append(l)
+            
+    proj_patterns = ['projector', 'connector', 'merger', 'visual_projection', 'multi_modal_projector']
+    post_proj_layers = []
+    for l in all_layers:
+        if any(p in l.lower() for p in proj_patterns):
+            post_proj_layers.append(l)
+            
+    lang_patterns = [r"model.layers", r"language_model", r"decoder", r"transformer.h", r"lm_head"]
+    lang_layers = []
+    for l in all_layers:
+        if any(p in l.lower() for p in lang_patterns):
+            lang_layers.append(l)
+
+    if layer_names:
+        pre_proj_layers = [l for l in pre_proj_layers if l in layer_names]
+        post_proj_layers = [l for l in post_proj_layers if l in layer_names]
+        lang_layers = [l for l in lang_layers if l in layer_names]
+
+    target_layers = pre_proj_layers + post_proj_layers + lang_layers
+    if not target_layers:
+        raise RuntimeError("No hookable layers found.")
+
+    batch = adapter.prepare(image, "[VISION_LOGIT_LENS]")
+    
+    input_ids = batch.model_inputs.get(adapter.config.text_input_key)
+    image_token_id = adapter.config.image_token_id
+    tokenizer = getattr(adapter, "tokenizer", None)
+    if image_token_id is None and tokenizer is not None:
+        try:
+            image_token_id = tokenizer.convert_tokens_to_ids(adapter.config.image_token_str)
+        except Exception:
+            image_token_id = None
+            
+    image_positions = []
+    if input_ids is not None and image_token_id is not None:
+        token_seq = input_ids[0]
+        image_mask = token_seq == image_token_id
+        image_positions = image_mask.nonzero(as_tuple=True)[0].cpu().tolist()
+
+    top_k = max(1, top_k)
+    
+    with torch.no_grad():
+        with ForwardHookCache(adapter.model, target_layers, max_tokens=None) as cache:
+            _forward_adapter(adapter, batch.model_inputs, requires_grad=False)
+
+    stages: dict[str, list[VisionLogitLensStep]] = {"pre_projector": [], "post_projector": [], "language_layers": []}
+    
+    def decode_hidden(hidden_states: torch.Tensor, layer_name: str, stage: str, positions_to_use: list[int] | None = None):
+        if hidden_states.ndim == 3:
+            hidden_seq = hidden_states[0]
+        elif hidden_states.ndim == 2:
+            hidden_seq = hidden_states
+        else:
+            return
+
+        seq_len = int(hidden_seq.shape[0])
+        pos_list = positions_to_use if positions_to_use is not None else list(range(seq_len))
+        
+        for pos in pos_list:
+            if pos < 0 or pos >= seq_len:
+                continue
+
+            hidden = hidden_seq[pos].to(device=adapter.device, dtype=torch.float32)
+            probs: torch.Tensor
+            if unembed is not None:
+                try:
+                    logits = unembed(hidden)
+                except Exception:
+                    continue
+                probs = torch.softmax(logits.float(), dim=-1)
+            else:
+                table = embed_table.to(device=hidden.device, dtype=hidden.dtype)
+                decode_hid = _project_hidden_for_embedding_table(adapter, hidden, int(table.shape[-1]))
+                if decode_hid is None:
+                    continue
+                token_scores = decode_hid @ table.transpose(0, 1)
+                probs = torch.softmax(token_scores.float(), dim=-1)
+
+            k = min(top_k, int(probs.shape[-1]))
+            values, indices = probs.topk(k)
+
+            idx_list = [int(i) for i in indices.detach().cpu().tolist()]
+            token_list = _convert_ids_to_tokens(adapter, idx_list)
+            prob_list = [float(v) for v in values.detach().cpu().tolist()]
+
+            stages[stage].append(
+                VisionLogitLensStep(
+                    layer_name=layer_name,
+                    position=int(pos),
+                    top_tokens=token_list,
+                    top_probabilities=prob_list,
+                    stage=stage,
+                    patch_index=int(pos) if positions_to_use is None else None
+                )
+            )
+
+    for layer_name in pre_proj_layers:
+        activation = cache.activations.get(layer_name)
+        if activation is not None:
+            decode_hidden(activation, layer_name, "pre_projector")
+            
+    for layer_name in post_proj_layers:
+        activation = cache.activations.get(layer_name)
+        if activation is not None:
+            decode_hidden(activation, layer_name, "post_projector")
+            
+    for layer_name in lang_layers:
+        activation = cache.activations.get(layer_name)
+        if activation is not None and image_positions:
+            decode_hidden(activation, layer_name, "language_layers", positions_to_use=image_positions)
+
+    return VisionLogitLensResult(
+        model_family=adapter.family,
+        model_name=adapter.model_name,
+        stages=stages
     )

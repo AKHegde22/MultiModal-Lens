@@ -225,3 +225,55 @@ class ForwardLayerPatcher:
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
         self.close()
+
+
+class ForwardInputPatcher:
+    """Modify a layer's INPUT tensor using register_forward_pre_hook.
+    
+    Required for edge-level path patching where we need to modify what
+    goes INTO a Q/K/V projection, not what comes OUT.
+    
+    The patch_fn receives the input tensor and should return the modified tensor.
+    """
+
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        layer_name: str,
+        patch_fn: Callable[[torch.Tensor], torch.Tensor],
+    ) -> None:
+        self.model = model
+        self.layer_name = layer_name
+        self.patch_fn = patch_fn
+        self._handle: torch.utils.hooks.RemovableHandle | None = None
+
+    def install(self) -> None:
+        module = dict(self.model.named_modules()).get(self.layer_name)
+        if module is None:
+            raise ValueError(f"Layer '{self.layer_name}' was not found in model modules.")
+
+        def _pre_hook(_module: torch.nn.Module, inputs: tuple[Any, ...]) -> tuple[Any, ...]:
+            # Extract the first tensor from inputs
+            tensor = _extract_first_tensor(inputs)
+            if tensor is None:
+                return inputs
+            # Apply patch_fn to it
+            patched = self.patch_fn(tensor)
+            if patched is tensor:
+                return inputs
+            # Return modified inputs tuple
+            return _replace_first_tensor(inputs, patched)
+        
+        self._handle = module.register_forward_pre_hook(_pre_hook)
+
+    def close(self) -> None:
+        if self._handle is not None:
+            self._handle.remove()
+            self._handle = None
+
+    def __enter__(self) -> ForwardInputPatcher:
+        self.install()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        self.close()

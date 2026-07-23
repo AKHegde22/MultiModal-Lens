@@ -69,26 +69,77 @@ class GenericVLMAdapter(ModelAdapter):
         prompt: str,
         compute_gradients: bool = False,
     ) -> AnalysisResult:
+        import math
         import numpy as np
+        import logging
+        import torch.nn.functional as F
         from multimodallens.types import AnalysisResult
 
         batch = self.prepare(image, prompt)
-        outputs = self._forward(batch.model_inputs, requires_grad=compute_gradients)
+        outputs = self._forward(
+            batch.model_inputs, 
+            requires_grad=compute_gradients,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict=True
+        )
         logits = getattr(outputs, "logits", None)
         score_val = float(logits.max().item()) if torch.is_tensor(logits) else 0.0
 
         n_toks = len(batch.tokens) or 1
+
+        if logits is not None and torch.is_tensor(logits) and logits.ndim >= 3:
+            probs = torch.softmax(logits[0], dim=-1)
+            token_scores = probs.max(dim=-1).values.detach().cpu().numpy()
+        elif hasattr(outputs, "hidden_states") and outputs.hidden_states is not None:
+            last_hidden = outputs.hidden_states[-1][0]
+            token_scores = torch.norm(last_hidden, dim=-1).detach().cpu().numpy()
+        else:
+            token_scores = np.zeros(n_toks, dtype=np.float32)
+
+        attention_maps = {}
+        attentions = getattr(outputs, "attentions", None)
+        if attentions is not None and len(attentions) > 0:
+            all_layers = torch.stack(attentions)
+            attention_maps["mean"] = all_layers.mean(dim=(0, 1, 2)).detach().cpu().numpy()
+            attention_maps["first_layer"] = attentions[0].mean(dim=(0, 1)).detach().cpu().numpy()
+            attention_maps["last_layer"] = attentions[-1].mean(dim=(0, 1)).detach().cpu().numpy()
+        else:
+            attention_maps = {"mean": np.ones((24, 24), dtype=np.float32)}
+
+        hidden_states = getattr(outputs, "hidden_states", None)
+        if hidden_states is not None and len(hidden_states) > 0:
+            last_hidden = hidden_states[-1]
+            vis_hidden, txt_hidden = self._segment_hidden_states(last_hidden, batch)
+            if vis_hidden is not None and txt_hidden is not None:
+                vis_norm = F.normalize(vis_hidden, p=2, dim=-1)
+                txt_norm = F.normalize(txt_hidden, p=2, dim=-1)
+                align_mat = torch.matmul(txt_norm, vis_norm.transpose(-1, -2))
+                alignment_matrix = align_mat.detach().cpu().numpy()
+            else:
+                alignment_matrix = np.zeros((n_toks, 576), dtype=np.float32)
+        else:
+            logging.warning("hidden_states not available for alignment_matrix")
+            alignment_matrix = np.zeros((n_toks, 576), dtype=np.float32)
+
+        patch_tokens = getattr(self.config, "vision_patch_tokens", None)
+        if patch_tokens is not None:
+            side = int(math.sqrt(patch_tokens))
+            patch_grid = (side, side)
+        else:
+            patch_grid = (14, 14)
+
         return AnalysisResult(
             model_family=self.family,
             model_name=self.model_name,
             prompt=prompt,
             tokens=batch.tokens,
             image_size=image.size,
-            patch_grid=(24, 24),
+            patch_grid=patch_grid,
             global_score=score_val,
-            token_scores=np.ones(n_toks, dtype=np.float32),
-            alignment_matrix=np.ones((n_toks, 576), dtype=np.float32),
-            attention_maps={"mean": np.ones((24, 24), dtype=np.float32)},
+            token_scores=token_scores,
+            alignment_matrix=alignment_matrix,
+            attention_maps=attention_maps,
             metadata={"config": self.config.family},
         )
 
@@ -139,14 +190,14 @@ class GenericVLMAdapter(ModelAdapter):
         )
 
 
-    def _forward(self, model_inputs: dict[str, Any], requires_grad: bool = False) -> Any:
+    def _forward(self, model_inputs: dict[str, Any], requires_grad: bool = False, **kwargs) -> Any:
         self.ensure_loaded()
         assert self.model is not None
 
         if requires_grad:
-            return self.model(**model_inputs)
+            return self.model(**model_inputs, **kwargs)
         with torch.no_grad():
-            return self.model(**model_inputs)
+            return self.model(**model_inputs, **kwargs)
 
     def _segment_hidden_states(
         self,

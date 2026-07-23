@@ -137,7 +137,8 @@ def run_model_preflight(
     report.supports_logit_lens = base_supported
     report.supports_grounding = base_supported
 
-    if report.resolved_family not in {"clip", "blip2", "llava"}:
+    canonical_families = {"clip", "blip2", "llava", "qwen2_vl", "pixtral", "idefics3", "paligemma"}
+    if report.resolved_family not in canonical_families:
         report.errors.append(
             f"Resolved family '{report.resolved_family}' does not map to a canonical adapter implementation."
         )
