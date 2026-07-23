@@ -46,19 +46,37 @@ class GenericVLMAdapter(ModelAdapter):
             self.tokenizer = processor.tokenizer
 
     def load_model_and_processor(self) -> tuple[Any, Any]:
-        from transformers import AutoProcessor, AutoModelForVision2Seq
+        import transformers
+        from transformers import AutoProcessor
 
         processor = AutoProcessor.from_pretrained(
             self.model_name,
             trust_remote_code=self.trust_remote_code,
         )
 
-        model = AutoModelForVision2Seq.from_pretrained(
-            self.model_name,
-            torch_dtype=self.torch_dtype,
-            trust_remote_code=self.trust_remote_code,
-            low_cpu_mem_usage=self.low_cpu_mem_usage,
-        )
+        model_cls = None
+        for cls_name in ["AutoModelForImageTextToText", "AutoModelForVision2Seq", "AutoModelForConditionalGeneration", "AutoModel"]:
+            if hasattr(transformers, cls_name):
+                model_cls = getattr(transformers, cls_name)
+                break
+        if model_cls is None:
+            model_cls = transformers.AutoModel
+
+        try:
+            model = model_cls.from_pretrained(
+                self.model_name,
+                torch_dtype=self.torch_dtype,
+                trust_remote_code=self.trust_remote_code,
+                low_cpu_mem_usage=self.low_cpu_mem_usage,
+                attn_implementation="eager",
+            )
+        except Exception:
+            model = model_cls.from_pretrained(
+                self.model_name,
+                torch_dtype=self.torch_dtype,
+                trust_remote_code=self.trust_remote_code,
+                low_cpu_mem_usage=self.low_cpu_mem_usage,
+            )
 
         model = model.to(self.device)
         return model, processor
@@ -155,11 +173,43 @@ class GenericVLMAdapter(ModelAdapter):
         assert self.processor is not None
 
         image_rgbs = [image.convert("RGB")]
-        inputs = self.processor(
-            text=prompt,
-            images=image_rgbs,
-            return_tensors="pt",
-        )
+
+        if hasattr(self.processor, "apply_chat_template"):
+            try:
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image", "image": image},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ]
+                formatted_text = self.processor.apply_chat_template(
+                    messages, tokenize=False, add_generation_prompt=True
+                )
+                inputs = self.processor(
+                    text=[formatted_text],
+                    images=image_rgbs,
+                    padding=True,
+                    return_tensors="pt",
+                )
+            except Exception:
+                if self.config.image_token_str and self.config.image_token_str not in prompt:
+                    prompt = f"{self.config.image_token_str}\n{prompt}"
+                inputs = self.processor(
+                    text=prompt,
+                    images=image_rgbs,
+                    return_tensors="pt",
+                )
+        else:
+            if self.config.image_token_str and self.config.image_token_str not in prompt:
+                prompt = f"{self.config.image_token_str}\n{prompt}"
+            inputs = self.processor(
+                text=prompt,
+                images=image_rgbs,
+                return_tensors="pt",
+            )
 
         moved_inputs: dict[str, Any] = {}
         for k, v in inputs.items():

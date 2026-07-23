@@ -10,6 +10,7 @@ from PIL import Image
 from multimodallens.adapters.base import ModelAdapter
 from multimodallens.analysis.hooking import list_hookable_layers
 from multimodallens.core.hooks import ForwardHookCache
+from multimodallens.core.config_schema import get_multimodal_config
 from multimodallens.types import LogitLensResult, LogitLensStep
 from dataclasses import dataclass
 
@@ -287,12 +288,16 @@ def run_vision_logit_lens(
 
     batch = adapter.prepare(image, "[VISION_LOGIT_LENS]")
     
-    input_ids = batch.model_inputs.get(adapter.config.text_input_key)
-    image_token_id = adapter.config.image_token_id
+    cfg = getattr(adapter, "config", None) or get_multimodal_config(adapter.family)
+    text_key = getattr(cfg, "text_input_key", "input_ids")
+    image_token_str = getattr(cfg, "image_token_str", "<image>")
+    image_token_id = getattr(cfg, "image_token_id", None)
+
+    input_ids = batch.model_inputs.get(text_key)
     tokenizer = getattr(adapter, "tokenizer", None)
     if image_token_id is None and tokenizer is not None:
         try:
-            image_token_id = tokenizer.convert_tokens_to_ids(adapter.config.image_token_str)
+            image_token_id = tokenizer.convert_tokens_to_ids(image_token_str)
         except Exception:
             image_token_id = None
             

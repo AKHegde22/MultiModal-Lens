@@ -21,6 +21,7 @@ dist/
 # Exported analysis artifacts
 artifacts/
 reports/
+outputs/
 
 
 # OS files

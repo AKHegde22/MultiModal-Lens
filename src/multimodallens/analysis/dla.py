@@ -11,7 +11,7 @@ from PIL import Image
 from multimodallens.adapters.base import ModelAdapter
 from multimodallens.analysis.hooking import list_hookable_layers
 from multimodallens.core.hooks import ForwardHookCache, _extract_first_tensor
-from multimodallens.analysis.logit_lens import _get_unembedding, _forward_adapter
+from multimodallens.analysis.logit_lens import _get_unembedding, _get_embedding_table, _forward_adapter
 
 
 @dataclass
@@ -221,8 +221,13 @@ def run_multimodal_dla(
     assert adapter.model is not None
 
     unembed = _get_unembedding(adapter)
-    if unembed is None:
-        raise RuntimeError("Model does not expose output embeddings required for Direct Logit Attribution.")
+    unembed_weight = getattr(unembed, "weight", None) if unembed is not None else None
+
+    if unembed_weight is None:
+        unembed_weight = _get_embedding_table(adapter)
+
+    if unembed_weight is None or not torch.is_tensor(unembed_weight):
+        raise RuntimeError("Model does not expose output or input embeddings required for Direct Logit Attribution.")
 
     batch = adapter.prepare(image, prompt)
     selected = layer_names or list_hookable_layers(adapter, include_patterns=include_patterns)
@@ -245,9 +250,7 @@ def run_multimodal_dla(
         else:
             target_id = 0
 
-    unembed_weight = getattr(unembed, "weight", None)
-    if unembed_weight is None or not torch.is_tensor(unembed_weight):
-        raise RuntimeError("Unembedding layer must have a 'weight' tensor for per-head DLA.")
+
 
     o_projs = [l for l in selected if l.endswith("o_proj") or l.endswith("c_proj") or (l.endswith("dense") and "attn" in l)]
     mlps = [l for l in selected if l.endswith("mlp") or l.endswith("ffn")]
@@ -318,6 +321,16 @@ def run_multimodal_dla(
         W_O_reshaped = W_O.view(out_features, n_heads, head_dim)
 
         head_out = torch.einsum("ohd,hd->ho", W_O_reshaped, h_inp_heads)
+        if head_out.shape[-1] != d.shape[-1]:
+            vis_proj = getattr(adapter.model, "visual_projection", None)
+            if vis_proj is not None and callable(vis_proj):
+                try:
+                    head_out = vis_proj(head_out)
+                except Exception:
+                    continue
+            else:
+                continue
+
         scores = torch.mv(head_out, d)
 
         for head_idx in range(n_heads):
@@ -348,6 +361,16 @@ def run_multimodal_dla(
         else:
             continue
 
+        if h_out.shape[-1] != d.shape[-1]:
+            vis_proj = getattr(adapter.model, "visual_projection", None)
+            if vis_proj is not None and callable(vis_proj):
+                try:
+                    h_out = vis_proj(h_out)
+                except Exception:
+                    continue
+            else:
+                continue
+
         score = float(torch.dot(h_out, d).item())
         norm_val = float(torch.norm(h_out).item())
         mlp_contributions.append(
@@ -368,7 +391,20 @@ def run_multimodal_dla(
                 h_emb = emb_out[0, -1].to(device=adapter.device, dtype=torch.float32)
             elif emb_out.ndim == 2:
                 h_emb = emb_out[-1].to(device=adapter.device, dtype=torch.float32)
-            embed_contrib = float(torch.dot(h_emb, d).item())
+            else:
+                h_emb = None
+            if h_emb is not None:
+                if h_emb.shape[-1] != d.shape[-1]:
+                    vis_proj = getattr(adapter.model, "visual_projection", None)
+                    if vis_proj is not None and callable(vis_proj):
+                        try:
+                            h_emb = vis_proj(h_emb)
+                        except Exception:
+                            h_emb = None
+                    else:
+                        h_emb = None
+                if h_emb is not None:
+                    embed_contrib = float(torch.dot(h_emb, d).item())
 
     residual_error = total_logit - (total_attn_sum + total_mlp_sum + embed_contrib)
 
