@@ -261,39 +261,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
     font-size:.68rem;font-weight:600;text-transform:uppercase;
     letter-spacing:.04em;color:var(--ink-faint);width:6.5rem;
   }
-/* ASCII Cards & Terminal Diagrams */
-.ascii-card{
-  margin:2rem 0;border:1px solid var(--rule-strong);
-  border-radius:8px;background:#141210;color:#e8e3dc;
-  font-family:var(--font-mono);overflow:hidden;
-  box-shadow:0 6px 24px rgba(0,0,0,0.12);
-}
-.ascii-card .card-bar{
-  display:flex;align-items:center;gap:6px;
-  padding:.45rem .85rem;background:#221e1a;
-  border-bottom:1px solid #332d27;font-size:.72rem;
-  color:#a89f91;font-family:var(--font-mono);
-}
-.ascii-card .card-bar .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
-.ascii-card .card-bar .dot.r{background:#e05f55}
-.ascii-card .card-bar .dot.y{background:#e0ac55}
-.ascii-card .card-bar .dot.g{background:#55e07a}
-.ascii-card pre{
-  padding:1.1rem;font-size:.76rem;line-height:1.42;
-  overflow-x:auto;color:#e8e3dc;margin:0;background:#141210;
-}
-.ascii-card pre code{
-  background:none!important;padding:0!important;color:inherit!important;
-}
-.ascii-card .hl-accent{color:#f27a59;font-weight:600}
-.ascii-card .hl-blue{color:#6ba4ff;font-weight:500}
-.ascii-card .hl-green{color:#57d995;font-weight:500}
-.ascii-card .hl-purple{color:#c084fc;font-weight:500}
-.ascii-card .hl-dim{color:#7a7065}
-.ascii-card figcaption{
-  font-size:.78rem;color:var(--ink-faint);padding:.6rem 1rem;
-  font-style:italic;text-align:center;border-top:1px solid var(--rule);
-  background:var(--paper);font-family:var(--font-body);
+  footer{padding:1.5rem 1.25rem 2.5rem;flex-direction:column;text-align:center}
 }
 </style>
 </head>
@@ -330,27 +298,89 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
   <strong>MultiModalLens</strong> is a Python library that lets you look inside vision-language models. It inspects attention, alignment, and causal circuits across 20+ Hugging Face VLM architectures, with faithfulness checks built in so your heatmaps don't lie.
 </p>
 
-<!-- Attention heatmap — ASCII terminal rollout representation -->
-<figure class="ascii-card reveal reveal-scale">
-  <div class="card-bar">
-    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-    <span>multimodallens --attention-rollout --model clip-vit-base</span>
-  </div>
-  <pre><code><span class="hl-dim">+-------------------------------------------------------------------------------+</span>
-<span class="hl-dim">|</span> <span class="hl-accent">INPUT IMAGE (cat.jpg)</span>   <span class="hl-dim">|</span> <span class="hl-blue">RESIDUAL ATTENTION ROLLOUT MAP (Layer 11, Head 4)</span>    <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">+-------------------+</span>   <span class="hl-dim">|</span>                                                      <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">|</span>   <span class="hl-accent">/\_/\</span>    [head] <span class="hl-dim">|</span>   <span class="hl-dim">|</span>  Patches:  [0]   [1]   [2]   [3]   [4]   [5]   [6]   [7]  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">|</span>  <span class="hl-accent">( o.o )</span>   [eyes] <span class="hl-dim">|</span>   <span class="hl-dim">|</span>  Row 0:   .02   .05   .12   .04   .01   .03   .08   .02  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">|</span>   <span class="hl-accent">> ^ &lt;</span>    [ears] <span class="hl-dim">|</span>   <span class="hl-dim">|</span>  Row 1:   .04  <span class="hl-accent">.42*  .87*  .45*</span>  .11   .05   .18   .03  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">|</span>  <span class="hl-accent">/     \</span>   [body] <span class="hl-dim">|</span>   <span class="hl-dim">|</span>  Row 2:   .08  <span class="hl-accent">.65*  .99*  .82*</span>  .24   .08   .42   .07  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">|</span> <span class="hl-accent">(____|__)</span>  [paws] <span class="hl-dim">|</span>   <span class="hl-dim">|</span>  Row 3:   .03   .21  <span class="hl-accent">.54*  .76*  .89*</span>  .31   .15   .04  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-dim">+-------------------+</span>   <span class="hl-dim">|</span>  Row 4:   .01   .06   .15   .28  <span class="hl-accent">.52*  .61*</span>  .22   .02  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>                         <span class="hl-dim">|</span>                                                      <span class="hl-dim">|</span>
-<span class="hl-dim">|</span> <span class="hl-purple">Text Tokens:</span>            <span class="hl-dim">|</span>  <span class="hl-green">Faithfulness Diagnostics:</span>                           <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  [a] [photo] [of]       <span class="hl-dim">|</span>  &bull; Deletion AUC:    <span class="hl-green">0.842</span> (Score drops on ablation)  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  [a] [<span class="hl-accent">CAT*</span>] [.]         <span class="hl-dim">|</span>  &bull; Grad-Attn Corr:  <span class="hl-green">r=0.791</span> (Spearman rank p &lt; 1e-4) <span class="hl-dim">|</span>
-<span class="hl-dim">+-------------------------------------------------------------------------------+</span></code></pre>
-  <figcaption>Residual-augmented attention rollout for CLIP on a cat photo &mdash; "cat" token attends strongly to body and paw patch clusters.</figcaption>
+<!-- Attention heatmap — what the tool actually produces -->
+<figure class="hero-heatmap reveal reveal-scale">
+  <svg viewBox="0 0 640 220" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans,sans-serif" role="img" aria-label="CLIP attention heatmap showing token-to-patch alignment for a cat photo">
+    <defs>
+      <linearGradient id="heat" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#2d5fb4" stop-opacity=".1"/>
+        <stop offset="35%" stop-color="#b44a2d" stop-opacity=".5"/>
+        <stop offset="70%" stop-color="#b44a2d" stop-opacity=".85"/>
+        <stop offset="100%" stop-color="#ffd4b8" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <!-- Left: mini image placeholder -->
+    <rect x="16" y="16" width="120" height="90" rx="6" fill="#f0ede8" stroke="#c4b9ab"/>
+    <text x="76" y="52" fill="#9e958a" font-size="9" text-anchor="middle" font-weight="500">input image</text>
+    <rect x="28" y="58" width="96" height="36" rx="3" fill="#ddd5ca" opacity=".5"/>
+    <circle cx="56" cy="70" r="8" fill="#c4b9ab" opacity=".4"/>
+    <circle cx="80" cy="68" r="6" fill="#c4b9ab" opacity=".3"/>
+    <rect x="60" cy="76" width="20" height="12" rx="2" fill="#c4b9ab" opacity=".25"/>
+
+    <!-- Right: attention heatmap grid (8x5 patches) -->
+    <text x="160" y="12" fill="#9e958a" font-size="8" font-weight="600" letter-spacing=".06em">ATTENTION HEATMAP</text>
+    <g transform="translate(160,20)">
+      <!-- Grid cells with varying heat -->
+      <rect x="0" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".12"/>
+      <rect x="32" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+      <rect x="64" y="0" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="96" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+      <rect x="128" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="160" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".05"/>
+      <rect x="192" y="0" width="28" height="28" rx="3" fill="#b44a2d" opacity=".15"/>
+      <rect x="224" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+
+      <rect x="0" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+      <rect x="32" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".25"/>
+      <rect x="64" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".55"/>
+      <rect x="96" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="128" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="160" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="192" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="224" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+
+      <rect x="0" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".15"/>
+      <rect x="32" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".45"/>
+      <rect x="64" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".8"/>
+      <rect x="96" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".65"/>
+      <rect x="128" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".4"/>
+      <rect x="160" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="192" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".5"/>
+      <rect x="224" y="64" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+
+      <rect x="0" y="96" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="32" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="64" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".5"/>
+      <rect x="96" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".7"/>
+      <rect x="128" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".85"/>
+      <rect x="160" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="192" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".25"/>
+      <rect x="224" y="96" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+
+      <rect x="0" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+      <rect x="32" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".12"/>
+      <rect x="64" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="96" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="128" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".45"/>
+      <rect x="160" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".6"/>
+      <rect x="192" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="224" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+
+      <!-- Token labels on right -->
+      <text x="264" y="18" fill="#1a1612" font-size="9" font-weight="500">a</text>
+      <text x="264" y="50" fill="#1a1612" font-size="9" font-weight="600" fill="#b44a2d">photo</text>
+      <text x="264" y="82" fill="#1a1612" font-size="9" font-weight="700" fill="#b44a2d">of</text>
+      <text x="264" y="114" fill="#1a1612" font-size="9" font-weight="600" fill="#b44a2d">cat</text>
+      <text x="264" y="146" fill="#1a1612" font-size="9" font-weight="500">.</text>
+
+      <!-- Patch grid labels -->
+      <text x="0" y="172" fill="#9e958a" font-size="7">head</text>
+      <text x="64" y="172" fill="#9e958a" font-size="7">body</text>
+      <text x="128" y="172" fill="#9e958a" font-size="7">paw</text>
+      <text x="192" y="172" fill="#9e958a" font-size="7">tail</text>
+    </g>
+  </svg>
+  <figcaption>Residual-augmented attention rollout for CLIP on a cat photo &mdash; "cat" token attends strongly to the body and paw patches.</figcaption>
 </figure>
 
 <div class="install-bar">
@@ -426,42 +456,66 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 </p>
 
 <!-- Architecture diagram -->
-<figure class="ascii-card reveal reveal-up">
-  <div class="card-bar">
-    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-    <span>multimodallens --architecture-overview</span>
-  </div>
-  <pre><code><span class="hl-dim">+-------------------------------------------------------------------------------+</span>
-<span class="hl-dim">|</span>                            <span class="hl-purple">INPUT PREPROCESSING</span>                                <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>     <span class="hl-accent">[ Image (RGB Tensor) ]</span>   +   <span class="hl-blue">[ Text Prompt ("a photo of a cat") ]</span>         <span class="hl-dim">|</span>
-<span class="hl-dim">+--------------------------------------T----------------------------------------+</span>
-                                       <span class="hl-dim">| (AutoProcessor)</span>
-                                       <span class="hl-dim">v</span>
-<span class="hl-dim">+-------------------------------------------------------------------------------+</span>
-<span class="hl-dim">|</span>                            <span class="hl-accent">CORE ENGINE LAYER</span>                                  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  +--------------------+   +--------------------+   +-----------------------+  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  |     <span class="hl-accent">HookedVLM</span>      |   |    <span class="hl-accent">LensPipeline</span>    |   |    <span class="hl-accent">ActivationCache</span>    |  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  | (Interventions API)|   | (Execution Runner) |   | (Named Layer Tensors) |  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  +--------------------+   +--------------------+   +-----------------------+  <span class="hl-dim">|</span>
-<span class="hl-dim">+--------------------------------------T----------------------------------------+</span>
-                                       <span class="hl-dim">| (PyTorch Hooks)</span>
-                                       <span class="hl-dim">v</span>
-<span class="hl-dim">+-------------------------------------------------------------------------------+</span>
-<span class="hl-dim">|</span>                           <span class="hl-green">ADAPTER DISPATCHER</span>                                  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  +-------------+   +-------------+   +-------------+   +-------------------+  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  | <span class="hl-green">CLIPAdapter</span> |   |<span class="hl-accent">BLIP2Adapter</span> |   | <span class="hl-purple">LlavaAdapter</span>|   |<span class="hl-blue">GenericVLMAdapter</span>  |  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  | (Dual Tower)|   |  (Q-Former) |   | (Interleaved|   |   (HF Fallback)   |  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  +-------------+   +-------------+   +-------------+   +-------------------+  <span class="hl-dim">|</span>
-<span class="hl-dim">+--------------------------------------T----------------------------------------+</span>
-                                       <span class="hl-dim">| (Standardized Forward)</span>
-                                       <span class="hl-dim">v</span>
-<span class="hl-dim">+-------------------------------------------------------------------------------+</span>
-<span class="hl-dim">|</span>                            <span class="hl-blue">NORMALIZED ANALYSIS OUTPUT</span>                          <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  * <span class="hl-blue">AnalysisResult</span>     * <span class="hl-accent">Attention Maps</span>    * <span class="hl-green">Alignment Matrix</span>  * <span class="hl-purple">Faithfulness</span>  <span class="hl-dim">|</span>
-<span class="hl-dim">|</span>  * <span class="hl-blue">DLA Logit Drops</span>    * <span class="hl-accent">Causal Path Patch</span> * <span class="hl-green">Linear Probes</span>     * <span class="hl-purple">SAE Features</span>   <span class="hl-dim">|</span>
-<span class="hl-dim">+-------------------------------------------------------------------------------+</span></code></pre>
-  <figcaption>The adapterized architecture. All model-specific logic is isolated behind the ModelAdapter interface.</figcaption>
-</figure>
+<div class="diagram reveal reveal-up">
+  <svg viewBox="0 0 700 400" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans,sans-serif" role="img" aria-label="Architecture diagram: Input flows through Core Engine into Adapter Layer, producing Normalized Output">
+    <defs>
+      <pattern id="dots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+        <circle cx="8" cy="8" r=".5" fill="#c4b9ab" opacity=".3"/>
+      </pattern>
+    </defs>
+    <rect width="700" height="400" fill="url(#dots)" rx="6"/>
+
+    <!-- Input -->
+    <rect x="24" y="20" width="652" height="56" rx="6" fill="#fff" stroke="#c4b9ab"/>
+    <text x="42" y="42" fill="#9e958a" font-size="9" font-weight="600" letter-spacing=".06em">INPUT</text>
+    <text x="42" y="58" fill="#1a1612" font-size="11" font-weight="500">Image + Text Prompt</text>
+    <rect x="260" y="32" width="36" height="30" rx="4" fill="#faf8f5" stroke="#b44a2d" stroke-width=".8"/>
+    <text x="278" y="51" fill="#b44a2d" font-size="8" text-anchor="middle" font-weight="500">IMG</text>
+    <text x="310" y="51" fill="#9e958a" font-size="11">+</text>
+    <rect x="326" y="32" width="36" height="30" rx="4" fill="#faf8f5" stroke="#6b3fa0" stroke-width=".8"/>
+    <text x="344" y="51" fill="#6b3fa0" font-size="8" text-anchor="middle" font-weight="500">TXT</text>
+    <text x="376" y="51" fill="#9e958a" font-size="10">&rarr;</text>
+    <rect x="392" y="32" width="90" height="30" rx="4" fill="#faf8f5" stroke="#2d5fb4" stroke-width=".8"/>
+    <text x="437" y="51" fill="#2d5fb4" font-size="8" text-anchor="middle" font-weight="500">AutoProcessor</text>
+
+    <line x1="350" y1="76" x2="350" y2="100" stroke="#c4b9ab" stroke-width="1" stroke-dasharray="3 3"/>
+    <polygon points="347,98 350,105 353,98" fill="#c4b9ab"/>
+
+    <!-- Core -->
+    <rect x="140" y="112" width="420" height="72" rx="6" fill="#fff" stroke="#b44a2d" stroke-width="1.2"/>
+    <text x="158" y="132" fill="#b44a2d" font-size="9" font-weight="600" letter-spacing=".06em">CORE ENGINE</text>
+    <rect x="158" y="144" width="115" height="28" rx="4" fill="#b44a2d08" stroke="#b44a2d" stroke-width=".7"/>
+    <text x="215" y="163" fill="#b44a2d" font-size="9" text-anchor="middle" font-weight="500">HookedVLM</text>
+    <rect x="285" y="144" width="115" height="28" rx="4" fill="#b44a2d08" stroke="#b44a2d" stroke-width=".7"/>
+    <text x="342" y="163" fill="#b44a2d" font-size="9" text-anchor="middle" font-weight="500">LensPipeline</text>
+    <rect x="412" y="144" width="130" height="28" rx="4" fill="#b44a2d08" stroke="#b44a2d" stroke-width=".7"/>
+    <text x="477" y="163" fill="#b44a2d" font-size="9" text-anchor="middle" font-weight="500">ActivationCache</text>
+
+    <line x1="350" y1="184" x2="350" y2="208" stroke="#c4b9ab" stroke-width="1" stroke-dasharray="3 3"/>
+    <polygon points="347,206 350,213 353,206" fill="#c4b9ab"/>
+
+    <!-- Adapters -->
+    <rect x="24" y="220" width="652" height="72" rx="6" fill="#fff" stroke="#c4b9ab"/>
+    <text x="42" y="240" fill="#9e958a" font-size="9" font-weight="600" letter-spacing=".06em">ADAPTER LAYER</text>
+    <rect x="42" y="254" width="140" height="26" rx="4" fill="#2d7a4f0a" stroke="#2d7a4f" stroke-width=".7"/>
+    <text x="112" y="272" fill="#2d7a4f" font-size="9" text-anchor="middle" font-weight="500">CLIPAdapter</text>
+    <rect x="196" y="254" width="140" height="26" rx="4" fill="#b44a2d0a" stroke="#b44a2d" stroke-width=".7"/>
+    <text x="266" y="272" fill="#b44a2d" font-size="9" text-anchor="middle" font-weight="500">BLIP2Adapter</text>
+    <rect x="350" y="254" width="140" height="26" rx="4" fill="#6b3fa00a" stroke="#6b3fa0" stroke-width=".7"/>
+    <text x="420" y="272" fill="#6b3fa0" font-size="9" text-anchor="middle" font-weight="500">LlavaAdapter</text>
+    <rect x="504" y="254" width="160" height="26" rx="4" fill="#2d5fb40a" stroke="#2d5fb4" stroke-width=".7"/>
+    <text x="584" y="272" fill="#2d5fb4" font-size="9" text-anchor="middle" font-weight="500">GenericVLMAdapter</text>
+
+    <line x1="350" y1="292" x2="350" y2="316" stroke="#c4b9ab" stroke-width="1" stroke-dasharray="3 3"/>
+    <polygon points="347,314 350,321 353,314" fill="#c4b9ab"/>
+
+    <!-- Output -->
+    <rect x="24" y="328" width="652" height="52" rx="6" fill="#fff" stroke="#c4b9ab"/>
+    <text x="42" y="348" fill="#9e958a" font-size="9" font-weight="600" letter-spacing=".06em">NORMALIZED OUTPUT</text>
+    <text x="42" y="366" fill="#5c534a" font-size="9.5">AnalysisResult &nbsp;&middot;&nbsp; Attention Maps &nbsp;&middot;&nbsp; Alignment &nbsp;&middot;&nbsp; Score &nbsp;&middot;&nbsp; Faithfulness &nbsp;&middot;&nbsp; Logits</text>
+  </svg>
+  <p class="diagram-caption">The adapterized architecture. All model-specific logic is isolated behind the ModelAdapter interface.</p>
+</div>
 
 <p>
   Four canonical adapters implement the same <code>load()</code>, <code>prepare()</code>,
@@ -623,21 +677,6 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
   <li><strong>Direct logit attribution</strong> &mdash; decompose target token logit into per-head and per-MLP contributions</li>
   <li><strong>Causal path patching</strong> &mdash; edge-level intervention analysis between sender and receiver components</li>
 </ul>
-
-<!-- DLA Circuit ASCII Diagram -->
-<figure class="ascii-card reveal reveal-left">
-  <div class="card-bar">
-    <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-    <span>multimodallens --dla-circuit-tracing</span>
-  </div>
-  <pre><code><span class="hl-dim">Residual x_0 ---+---> [ LayerNorm ] ---> [ Head L0.H1 (W_V @ W_O) ] --+---> Residual x_1</span>
-<span class="hl-dim">                |                                                     |</span>
-<span class="hl-dim">                +---> [ LayerNorm ] ---> [ MLP Layer 0 (W_in @ W_out) ]+</span>
-<span class="hl-dim">                                                                      |</span>
-<span class="hl-dim">                                                                      v</span>
-<span class="hl-dim">Target Logit y_c &lt;------------------ [ W_U Unembed ] &lt;-----------------+</span></code></pre>
-  <figcaption>Direct Logit Attribution (DLA) circuit trace decomposing output logits into per-head and per-MLP contributions.</figcaption>
-</figure>
 
 <div class="callout reveal reveal-left">
   <div class="callout-title">The diagnostic tuple</div>
