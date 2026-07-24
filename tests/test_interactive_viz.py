@@ -75,3 +75,54 @@ def test_path_patching_interactive_viz_html_and_plotly():
 def test_create_interactive_dashboard_html():
     dashboard = create_interactive_dashboard_html()
     assert "No interactive components" in dashboard
+
+
+def test_new_plotly_figures():
+    from multimodallens.types import LogitLensResult, LogitLensStep, LayerActivationRun, LayerActivation
+    from multimodallens.viz.interactive import (
+        create_logit_lens_plotly_figure,
+        create_alignment_plotly_figure,
+        create_attention_plotly_figure,
+        create_residual_trajectory_plotly_figure,
+    )
+    import numpy as np
+
+    # Test Logit Lens Plotly
+    ll_step = LogitLensStep(
+        layer_name="layer.0",
+        position=0,
+        top_tokens=["cat", "dog"],
+        top_probabilities=[0.8, 0.1],
+    )
+    ll_res = LogitLensResult(
+        model_family="llava",
+        model_name="toy",
+        prompt="cat",
+        steps=[ll_step],
+    )
+    fig_ll = create_logit_lens_plotly_figure(ll_res)
+    assert isinstance(fig_ll, go.Figure)
+
+    # Test Alignment Plotly
+    matrix = np.random.randn(3, 4)
+    fig_align = create_alignment_plotly_figure(matrix, ["a", "b", "c"])
+    assert isinstance(fig_align, go.Figure)
+
+    # Test Attention Plotly
+    attn_mat = np.random.rand(4, 4)
+    fig_attn = create_attention_plotly_figure(attn_mat)
+    assert isinstance(fig_attn, go.Figure)
+
+    # Test Residual Trajectory Plotly
+    l0 = LayerActivation(layer_name="layer.0", shape=(1, 16), values=np.random.randn(1, 16))
+    l1 = LayerActivation(layer_name="layer.1", shape=(1, 16), values=np.random.randn(1, 16))
+    run = LayerActivationRun(
+        model_family="llava",
+        model_name="toy",
+        prompt="cat",
+        layers=[l0, l1],
+        tokens=["cat"],
+    )
+    fig_traj = create_residual_trajectory_plotly_figure(run)
+    assert isinstance(fig_traj, go.Figure)
+

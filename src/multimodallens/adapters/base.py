@@ -113,3 +113,38 @@ class ModelAdapter(ABC):
             "output_hidden_states": True,
             "return_dict": True,
         }
+
+    def generate(
+        self,
+        image: Image.Image,
+        prompt: str,
+        max_new_tokens: int = 20,
+        **kwargs: Any,
+    ) -> str:
+        """Run autoregressive text generation for input image and prompt."""
+        self.ensure_loaded()
+        assert self.model is not None
+
+        batch = self.prepare(image, prompt)
+        inputs = self._move_inputs(batch.model_inputs)
+
+        generate_fn = getattr(self.model, "generate", None)
+        if not callable(generate_fn):
+            raise NotImplementedError(f"Model family '{self.family}' does not support autoregressive generation.")
+
+        with torch.no_grad():
+            output_ids = generate_fn(**inputs, max_new_tokens=max_new_tokens, **kwargs)
+
+        if torch.is_tensor(output_ids) and "input_ids" in inputs:
+            prompt_len = int(inputs["input_ids"].shape[1])
+            if output_ids.ndim == 2 and output_ids.shape[1] > prompt_len:
+                output_ids = output_ids[:, prompt_len:]
+
+        tok = self.tokenizer or getattr(self.processor, "tokenizer", None)
+        if tok is not None and hasattr(tok, "decode"):
+            if torch.is_tensor(output_ids) and output_ids.ndim == 2:
+                return tok.decode(output_ids[0], skip_special_tokens=True)
+            return tok.decode(output_ids, skip_special_tokens=True)
+
+        return str(output_ids)
+

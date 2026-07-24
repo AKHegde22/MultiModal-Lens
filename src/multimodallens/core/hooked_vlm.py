@@ -160,6 +160,54 @@ class HookedVLM:
             for patcher in patchers:
                 patcher.close()
 
+    def generate(
+        self,
+        image: Image.Image,
+        prompt: str,
+        max_new_tokens: int = 20,
+        **kwargs: Any,
+    ) -> str:
+        """Run autoregressive text generation."""
+        return self._adapter.generate(image=image, prompt=prompt, max_new_tokens=max_new_tokens, **kwargs)
+
+    def generate_with_hooks(
+        self,
+        image: Image.Image,
+        prompt: str,
+        max_new_tokens: int = 20,
+        fwd_hooks: list[tuple[str, Callable[[torch.Tensor], torch.Tensor]]] | None = None,
+        **kwargs: Any,
+    ) -> str:
+        """Run autoregressive text generation with forward intervention hooks installed."""
+        if self._adapter.model is None:
+            self._adapter.ensure_loaded()
+
+        if not fwd_hooks:
+            return self.generate(image=image, prompt=prompt, max_new_tokens=max_new_tokens, **kwargs)
+
+        patchers: list[ForwardLayerPatcher] = []
+        for layer_name, hook_fn in fwd_hooks:
+            patcher = ForwardLayerPatcher(
+                model=self._adapter.model,
+                layer_name=layer_name,
+                patch_fn=hook_fn,
+            )
+            patchers.append(patcher)
+
+        try:
+            for patcher in patchers:
+                patcher.install()
+            return self._adapter.generate(
+                image=image,
+                prompt=prompt,
+                max_new_tokens=max_new_tokens,
+                **kwargs,
+            )
+        finally:
+            for patcher in patchers:
+                patcher.close()
+
+
     def dla(
         self,
         image: Image.Image,
@@ -246,15 +294,85 @@ class HookedVLM:
         from multimodallens.core.weight_processing import center_unembed
         center_unembed(self.model)
 
-    def ov_circuit(self, layer: int, head: int) -> 'FactoredMatrix':
+    def _find_attn_submodules(self, layer: int) -> tuple[torch.nn.Module, torch.nn.Module, torch.nn.Module, torch.nn.Module]:
+        """Find q_proj, k_proj, v_proj, o_proj for a given layer index."""
+        model = self.model
+        attn_module = None
+        for name, module in model.named_modules():
+            if (f"layers.{layer}.self_attn" in name or
+                f"layer.{layer}.attention" in name or
+                f"blocks.{layer}.attn" in name or
+                f"layers.{layer}.attn" in name or
+                f"h.{layer}.attn" in name):
+                attn_module = module
+                break
+
+        if attn_module is None:
+            for name, module in model.named_modules():
+                segments = name.split(".")
+                if len(segments) >= 2 and segments[-1] in ("self_attn", "attn", "attention") and (f".{layer}." in name or name.endswith(f".{layer}")):
+                    attn_module = module
+                    break
+
+        if attn_module is None:
+            raise ValueError(f"Could not locate attention module for layer {layer}.")
+
+        q_proj = getattr(attn_module, "q_proj", getattr(attn_module, "q", None))
+        k_proj = getattr(attn_module, "k_proj", getattr(attn_module, "k", None))
+        v_proj = getattr(attn_module, "v_proj", getattr(attn_module, "v", None))
+        o_proj = getattr(attn_module, "o_proj", getattr(attn_module, "out_proj", getattr(attn_module, "c_proj", None)))
+
+        if any(proj is None for proj in (q_proj, k_proj, v_proj, o_proj)):
+            sub_linears = {n: m for n, m in attn_module.named_modules() if isinstance(m, torch.nn.Linear)}
+            for n, m in sub_linears.items():
+                if "q" in n and q_proj is None:
+                    q_proj = m
+                elif "k" in n and k_proj is None:
+                    k_proj = m
+                elif "v" in n and v_proj is None:
+                    v_proj = m
+                elif ("o" in n or "out" in n or "proj" in n) and o_proj is None:
+                    o_proj = m
+
+        if any(proj is None for proj in (q_proj, k_proj, v_proj, o_proj)):
+            raise RuntimeError(f"Could not resolve Q/K/V/O projection matrices for layer {layer}.")
+
+        return q_proj, k_proj, v_proj, o_proj
+
+    def _extract_head_matrices(self, layer: int, head: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Extract W_Q, W_K, W_V, W_O for specific head of layer."""
+        q_proj, k_proj, v_proj, o_proj = self._find_attn_submodules(layer)
+
+        w_q = q_proj.weight  # [num_heads * d_head, d_model]
+        w_k = k_proj.weight  # [num_heads * d_head, d_model]
+        w_v = v_proj.weight  # [num_heads * d_head, d_model]
+        w_o = o_proj.weight  # [d_model, num_heads * d_head]
+
+        num_heads = getattr(self.model.config, "num_attention_heads", None)
+        if num_heads is None:
+            num_heads = getattr(self.model.config, "num_heads", getattr(self.model.config, "n_head", None))
+        if num_heads is None:
+            num_heads = 8
+
+        d_head = w_q.shape[0] // num_heads
+
+        W_Q = w_q.view(num_heads, d_head, -1)[head].T
+        W_K = w_k.view(num_heads, d_head, -1)[head].T
+        W_V = w_v.view(num_heads, d_head, -1)[head].T
+        W_O = w_o.view(-1, num_heads, d_head)[:, head, :].T
+
+        return W_Q, W_K, W_V, W_O
+
+    def ov_circuit(self, layer: int, head: int) -> FactoredMatrix:
         """Get the OV circuit for a specific attention head."""
         from multimodallens.core.factored_matrix import FactoredMatrix
-        # Find W_V and W_O for this layer/head
-        return FactoredMatrix(None, None)  # Placeholder
+        _, _, W_V, W_O = self._extract_head_matrices(layer, head)
+        return FactoredMatrix.ov_circuit(W_V, W_O)
 
-    def qk_circuit(self, layer: int, head: int) -> 'FactoredMatrix':
+    def qk_circuit(self, layer: int, head: int) -> FactoredMatrix:
         """Get the QK circuit for a specific attention head."""
         from multimodallens.core.factored_matrix import FactoredMatrix
-        # Find W_Q and W_K for this layer/head
-        return FactoredMatrix(None, None)  # Placeholder
+        W_Q, W_K, _, _ = self._extract_head_matrices(layer, head)
+        return FactoredMatrix.qk_circuit(W_Q, W_K)
+
 

@@ -247,3 +247,205 @@ def create_interactive_dashboard_html(
         tabs_html = "<div>No interactive components were generated.</div>"
     return tabs_html
 
+
+def create_logit_lens_plotly_figure(logit_lens_result: LogitLensResult) -> Any:
+    """Generate an interactive Plotly heatmap for Logit Lens predictions across layers."""
+    import plotly.graph_objects as go
+
+    if hasattr(logit_lens_result, "to_dict") and callable(getattr(logit_lens_result, "to_dict")):
+        data = logit_lens_result.to_dict()
+    else:
+        from dataclasses import asdict
+        data = asdict(logit_lens_result)
+
+    steps = data.get("steps", [])
+
+    if not steps:
+        fig = go.Figure()
+        fig.update_layout(title="No Logit Lens Data Available", template="plotly_dark")
+        return fig
+
+    layers = [s["layer_name"] for s in steps]
+    top_tokens = [s.get("top_tokens", ["?"])[0] if s.get("top_tokens") else "?" for s in steps]
+    top_probs = [
+        s.get("top_probabilities", s.get("top_probs", [0.0]))[0]
+        if (s.get("top_probabilities") or s.get("top_probs"))
+        else 0.0
+        for s in steps
+    ]
+
+    text_matrix = [[f"Token: '{t}'<br>Prob: {p:.4f}"] for t, p in zip(top_tokens, top_probs)]
+    z_matrix = [[p] for p in top_probs]
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=z_matrix,
+            y=layers,
+            x=["Rank 1 Prediction"],
+            text=text_matrix,
+            hoverinfo="text",
+            colorscale="Viridis",
+            showscale=True,
+        )
+    )
+
+    fig.update_layout(
+        title=f"Multimodal Logit Lens Trajectory<br><sup>Prompt: '{logit_lens_result.prompt}'</sup>",
+        xaxis_title="Top Predicted Token",
+        yaxis_title="Layer",
+        template="plotly_dark",
+    )
+    return fig
+
+
+def create_alignment_plotly_figure(
+    alignment_matrix: Any,
+    tokens: list[str],
+    patch_labels: list[str] | None = None,
+) -> Any:
+    """Generate an interactive Plotly heatmap for text-token to vision-patch alignment."""
+    import numpy as np
+    import plotly.graph_objects as go
+
+    matrix = np.asarray(alignment_matrix)
+    if matrix.ndim != 2:
+        fig = go.Figure()
+        fig.update_layout(title="Invalid Alignment Matrix Shape", template="plotly_dark")
+        return fig
+
+    num_tokens, num_patches = matrix.shape
+    y_labels = tokens[:num_tokens] if len(tokens) >= num_tokens else [f"Tok {i}" for i in range(num_tokens)]
+    x_labels = patch_labels[:num_patches] if patch_labels and len(patch_labels) >= num_patches else [f"Patch {j}" for j in range(num_patches)]
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=matrix,
+            x=x_labels,
+            y=y_labels,
+            colorscale="Plasma",
+            hoverinfo="x+y+z",
+        )
+    )
+
+    fig.update_layout(
+        title="Cross-Modal Token-Patch Alignment Heatmap",
+        xaxis_title="Vision Patches",
+        yaxis_title="Text Tokens",
+        template="plotly_dark",
+    )
+    return fig
+
+
+def create_attention_plotly_figure(
+    attn_matrix: Any,
+    source_labels: list[str] | None = None,
+    target_labels: list[str] | None = None,
+    title: str = "Attention Pattern Map",
+) -> Any:
+    """Generate an interactive Plotly heatmap for attention pattern maps."""
+    import numpy as np
+    import plotly.graph_objects as go
+
+    matrix = np.asarray(attn_matrix)
+    if matrix.ndim != 2:
+        fig = go.Figure()
+        fig.update_layout(title="Invalid Attention Matrix Shape", template="plotly_dark")
+        return fig
+
+    num_src, num_tgt = matrix.shape
+    y_labels = source_labels[:num_src] if source_labels and len(source_labels) >= num_src else [f"Src {i}" for i in range(num_src)]
+    x_labels = target_labels[:num_tgt] if target_labels and len(target_labels) >= num_tgt else [f"Tgt {j}" for j in range(num_tgt)]
+
+    fig = go.Figure(
+        go.Heatmap(
+            z=matrix,
+            x=x_labels,
+            y=y_labels,
+            colorscale="Cividis",
+            hoverinfo="x+y+z",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Key / Target Tokens",
+        yaxis_title="Query / Source Tokens",
+        template="plotly_dark",
+    )
+    return fig
+
+
+def create_residual_trajectory_plotly_figure(activations_run: Any) -> Any:
+    """Generate a 2D PCA scatter plot showing residual stream representation trajectory across layers."""
+    import numpy as np
+    import plotly.graph_objects as go
+
+    layers = getattr(activations_run, "layers", [])
+    if not layers:
+        fig = go.Figure()
+        fig.update_layout(title="No Layer Activations Available for Trajectory", template="plotly_dark")
+        return fig
+
+    layer_names = []
+    vectors = []
+
+    for layer in layers:
+        val = np.asarray(layer.values)
+        if val.size == 0:
+            continue
+        # Mean pool over batch & sequence dimensions to get a single vector per layer
+        while val.ndim > 1:
+            val = val.mean(axis=0)
+        layer_names.append(layer.layer_name)
+        vectors.append(val)
+
+    if len(vectors) < 2:
+        fig = go.Figure()
+        fig.update_layout(title="Insufficient Layers for Trajectory SVD", template="plotly_dark")
+        return fig
+
+    matrix = np.stack(vectors, axis=0)  # [num_layers, d_model]
+    matrix_centered = matrix - matrix.mean(axis=0, keepdims=True)
+
+    # Compute 2D SVD / PCA
+    try:
+        U, S, _ = np.linalg.svd(matrix_centered, full_matrices=False)
+        coords = U[:, :2] * S[:2]
+    except Exception:
+        coords = np.zeros((len(vectors), 2))
+
+    x_coords = coords[:, 0]
+    y_coords = coords[:, 1] if coords.shape[1] > 1 else np.zeros_like(x_coords)
+
+    fig = go.Figure()
+
+    # Trajectory line
+    fig.add_trace(
+        go.Scatter(
+            x=x_coords,
+            y=y_coords,
+            mode="lines+markers+text",
+            text=[f"L{i}" for i in range(len(layer_names))],
+            textposition="top center",
+            marker=dict(
+                size=10,
+                color=list(range(len(layer_names))),
+                colorscale="Viridis",
+                showscale=True,
+                colorbar=dict(title="Layer Index"),
+            ),
+            line=dict(color="#38bdf8", width=2),
+            hovertext=layer_names,
+            hoverinfo="text+x+y",
+        )
+    )
+
+    fig.update_layout(
+        title="Residual Stream State Trajectory Across Layers (2D PCA)",
+        xaxis_title="Principal Component 1",
+        yaxis_title="Principal Component 2",
+        template="plotly_dark",
+    )
+    return fig
+
+

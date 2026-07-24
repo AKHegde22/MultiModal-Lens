@@ -56,3 +56,21 @@ def test_hooked_vlm_run_with_hooks():
 
     patched = vlm.run_with_hooks(image, "test prompt", fwd_hooks=[(hook_points[0], zero_hook)])
     assert patched.global_score != baseline.global_score
+
+
+def test_hooked_vlm_circuits():
+    from tests.test_dla_correctness import _DeterministicAdapter
+    from multimodallens.core.factored_matrix import FactoredMatrix
+
+    adapter = _DeterministicAdapter(model_name="toy", device="cpu", dtype="float32")
+    adapter.load()
+    vlm = HookedVLM(adapter)
+
+    ov = vlm.ov_circuit(layer=0, head=0)
+    assert isinstance(ov, FactoredMatrix)
+    assert ov.shape == (16, 16)
+
+    qk = vlm.qk_circuit(layer=0, head=0)
+    assert isinstance(qk, FactoredMatrix)
+    assert qk.shape == (16, 16)
+

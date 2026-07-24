@@ -29,11 +29,18 @@ __all__ = [
     "HeadContribution",
     "MLPContribution",
     "EdgeEffect",
-    "FactoredMatrix",
     "fold_layer_norms",
     "center_writing_weights",
     "center_unembed",
     "ForwardInputPatcher",
+    "HookPoint",
+    "LinearProbe",
+    "evaluate_layer_probes",
+    "detect_induction_heads",
+    "detect_cross_modal_induction_heads",
+    "SparseAutoencoder",
+    "NeuronActivationSummary",
+    "analyze_neuron_activations",
     "MultimodalLensError",
     "ModelLoadError",
     "UnsupportedFamilyError",
@@ -114,6 +121,26 @@ def __getattr__(name: str) -> Any:
         import multimodallens.core.weight_processing as weight_processing
 
         return getattr(weight_processing, name)
+    if name in ("LinearProbe", "evaluate_layer_probes"):
+        import multimodallens.analysis.probing as probing
+
+        return getattr(probing, name)
+    if name == "HookPoint":
+        from multimodallens.core.hook_point import HookPoint
+
+        return HookPoint
+    if name == "SparseAutoencoder":
+        from multimodallens.analysis.sae import SparseAutoencoder
+
+        return SparseAutoencoder
+    if name in ("detect_induction_heads", "detect_cross_modal_induction_heads"):
+        import multimodallens.analysis.induction as induction
+
+        return getattr(induction, name)
+    if name in ("NeuronActivationSummary", "analyze_neuron_activations"):
+        import multimodallens.analysis.neurons as neurons
+
+        return getattr(neurons, name)
     if name == "ForwardInputPatcher":
         from multimodallens.core.hooks import ForwardInputPatcher
 

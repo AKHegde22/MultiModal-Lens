@@ -70,12 +70,34 @@ class _DeterministicVLM(torch.nn.Module):
         logits = self.lm_head(hidden)
         return SimpleNamespace(logits=logits)
 
+    def generate(
+        self,
+        input_ids: torch.Tensor,
+        pixel_values: torch.Tensor,
+        max_new_tokens: int = 5,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        curr_ids = input_ids.clone()
+        for _ in range(max_new_tokens):
+            out = self.forward(curr_ids, pixel_values)
+            next_token = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+            curr_ids = torch.cat([curr_ids, next_token], dim=1)
+        return curr_ids
+
+
 class _ToyTokenizer:
     def convert_ids_to_tokens(self, token_ids: list[int]) -> list[str]:
         return [f"tok_{i}" for i in token_ids]
-    
+
     def convert_tokens_to_ids(self, token: str) -> int:
         return int(token.split("_")[-1])
+
+    def decode(self, token_ids: Any, skip_special_tokens: bool = True) -> str:
+        if hasattr(token_ids, "tolist"):
+            token_ids = token_ids.tolist()
+        if isinstance(token_ids, int):
+            token_ids = [token_ids]
+        return " ".join([f"tok_{i}" for i in token_ids])
 
 class _DeterministicAdapter(ModelAdapter):
     family = "llava"
