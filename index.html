@@ -27,7 +27,7 @@
 }
 html{scroll-behavior:smooth;font-size:17px}
 body{font-family:var(--font-body);color:var(--ink);background:var(--paper);line-height:1.75;-webkit-font-smoothing:antialiased}
-::selection{background:var(--accent);color:#fff}
+::selection{background:var(--ink);color:var(--paper)}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .skip-link{position:absolute;top:-100%;left:1rem;z-index:999;padding:.5rem 1rem;background:var(--ink);color:var(--paper);font-weight:600;font-size:.8rem;border-radius:0 0 4px 4px;text-decoration:none}
@@ -192,6 +192,36 @@ article{max-width:var(--measure);margin:0 auto;padding:3rem 1.5rem 5rem}
 .callout-title{font-weight:600;font-size:.88rem;color:var(--green);margin-bottom:.35rem}
 .callout p{font-size:.88rem;color:var(--ink-secondary);margin:0;line-height:1.7}
 
+/* Hero heatmap */
+.hero-heatmap{
+  margin:0 0 2.5rem;border:1px solid var(--rule);border-radius:8px;
+  overflow:hidden;background:#fff;
+}
+.hero-heatmap svg{width:100%;height:auto;display:block}
+.hero-heatmap figcaption{
+  font-size:.78rem;color:var(--ink-faint);padding:.6rem 1rem;
+  font-style:italic;text-align:center;border-top:1px solid var(--rule);
+}
+
+/* Quickstart steps */
+.quickstart-steps{
+  margin:2rem 0;padding:0;list-style:none;counter-reset:qs;
+}
+.quickstart-steps li{
+  counter-increment:qs;position:relative;
+  padding:.75rem 1rem .75rem 3rem;margin-bottom:.5rem;
+  background:#fff;border:1px solid var(--rule);border-radius:6px;
+  font-size:.9rem;color:var(--ink-secondary);line-height:1.6;
+}
+.quickstart-steps li::before{
+  content:counter(qs);position:absolute;left:.75rem;top:.75rem;
+  width:1.5rem;height:1.5rem;border-radius:50%;
+  background:var(--ink);color:var(--paper);
+  font-size:.72rem;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.quickstart-steps li strong{color:var(--ink)}
+
 /* Footer */
 footer{
   max-width:800px;margin:0 auto;padding:2rem 1.5rem 3rem;
@@ -202,10 +232,13 @@ footer a{color:var(--ink-secondary);text-decoration:none;font-size:.8rem}
 footer a:hover{color:var(--accent)}
 footer .copy{color:var(--ink-faint);font-size:.78rem}
 
-/* Reveal */
-.sr{opacity:0;transform:translateY(16px);transition:opacity .5s ease,transform .5s ease}
-.sr.v{opacity:1;transform:translateY(0)}
-@media(prefers-reduced-motion:reduce){.sr{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+/* Reveal — varied, not uniform */
+.reveal{opacity:0;transition:opacity .35s ease,transform .35s ease}
+.reveal.v{opacity:1;transform:none}
+.reveal-up{transform:translateY(14px)}
+.reveal-left{transform:translateX(-10px)}
+.reveal-scale{transform:scale(.97)}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
 
 /* Responsive */
 @media(max-width:700px){
@@ -215,8 +248,19 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
   .header-nav{display:none}
   .hamburger{display:block}
   .install-bar{font-size:.75rem;padding:.5rem .75rem}
-  .model-table{font-size:.78rem}
-  .model-table td,.model-table th{padding:.4rem .5rem}
+  .model-table,.model-table thead,.model-table tbody,.model-table th,.model-table td,.model-table tr{display:block}
+  .model-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .model-table tr{margin-bottom:1rem;border:1px solid var(--rule);border-radius:6px;padding:.75rem;background:#fff}
+  .model-table td{padding:.35rem 0;border:none;font-size:.82rem;position:relative;padding-left:7rem}
+  .model-table td:first-child{
+    font-size:.88rem;font-weight:600;color:var(--ink);
+    padding-left:0;margin-bottom:.35rem;
+  }
+  .model-table td::before{
+    content:attr(data-label);position:absolute;left:0;top:.35rem;
+    font-size:.68rem;font-weight:600;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--ink-faint);width:6.5rem;
+  }
   footer{padding:1.5rem 1.25rem 2.5rem;flex-direction:column;text-align:center}
 }
 </style>
@@ -251,16 +295,101 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 <h1 class="hero-title">We built TransformerLens for language models. Nobody did the same for vision.</h1>
 
 <p class="hero-sub">
-  <strong>MultimodalLens</strong> is a Python library that lets you look inside vision-language models. It inspects attention, alignment, and causal circuits across 20+ Hugging Face VLM architectures, with faithfulness checks built in so your heatmaps don't lie.
+  <strong>MultiModalLens</strong> is a Python library that lets you look inside vision-language models. It inspects attention, alignment, and causal circuits across 20+ Hugging Face VLM architectures, with faithfulness checks built in so your heatmaps don't lie.
 </p>
+
+<!-- Attention heatmap — what the tool actually produces -->
+<figure class="hero-heatmap reveal reveal-scale">
+  <svg viewBox="0 0 640 220" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans,sans-serif" role="img" aria-label="CLIP attention heatmap showing token-to-patch alignment for a cat photo">
+    <defs>
+      <linearGradient id="heat" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#2d5fb4" stop-opacity=".1"/>
+        <stop offset="35%" stop-color="#b44a2d" stop-opacity=".5"/>
+        <stop offset="70%" stop-color="#b44a2d" stop-opacity=".85"/>
+        <stop offset="100%" stop-color="#ffd4b8" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <!-- Left: mini image placeholder -->
+    <rect x="16" y="16" width="120" height="90" rx="6" fill="#f0ede8" stroke="#c4b9ab"/>
+    <text x="76" y="52" fill="#9e958a" font-size="9" text-anchor="middle" font-weight="500">input image</text>
+    <rect x="28" y="58" width="96" height="36" rx="3" fill="#ddd5ca" opacity=".5"/>
+    <circle cx="56" cy="70" r="8" fill="#c4b9ab" opacity=".4"/>
+    <circle cx="80" cy="68" r="6" fill="#c4b9ab" opacity=".3"/>
+    <rect x="60" cy="76" width="20" height="12" rx="2" fill="#c4b9ab" opacity=".25"/>
+
+    <!-- Right: attention heatmap grid (8x5 patches) -->
+    <text x="160" y="12" fill="#9e958a" font-size="8" font-weight="600" letter-spacing=".06em">ATTENTION HEATMAP</text>
+    <g transform="translate(160,20)">
+      <!-- Grid cells with varying heat -->
+      <rect x="0" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".12"/>
+      <rect x="32" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+      <rect x="64" y="0" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="96" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+      <rect x="128" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="160" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".05"/>
+      <rect x="192" y="0" width="28" height="28" rx="3" fill="#b44a2d" opacity=".15"/>
+      <rect x="224" y="0" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+
+      <rect x="0" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+      <rect x="32" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".25"/>
+      <rect x="64" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".55"/>
+      <rect x="96" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="128" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="160" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="192" y="32" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="224" y="32" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+
+      <rect x="0" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".15"/>
+      <rect x="32" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".45"/>
+      <rect x="64" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".8"/>
+      <rect x="96" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".65"/>
+      <rect x="128" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".4"/>
+      <rect x="160" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="192" y="64" width="28" height="28" rx="3" fill="#b44a2d" opacity=".5"/>
+      <rect x="224" y="64" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+
+      <rect x="0" y="96" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+      <rect x="32" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="64" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".5"/>
+      <rect x="96" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".7"/>
+      <rect x="128" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".85"/>
+      <rect x="160" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="192" y="96" width="28" height="28" rx="3" fill="#b44a2d" opacity=".25"/>
+      <rect x="224" y="96" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".08"/>
+
+      <rect x="0" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".06"/>
+      <rect x="32" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".12"/>
+      <rect x="64" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".2"/>
+      <rect x="96" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".3"/>
+      <rect x="128" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".45"/>
+      <rect x="160" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".6"/>
+      <rect x="192" y="128" width="28" height="28" rx="3" fill="#b44a2d" opacity=".35"/>
+      <rect x="224" y="128" width="28" height="28" rx="3" fill="#2d5fb4" opacity=".1"/>
+
+      <!-- Token labels on right -->
+      <text x="264" y="18" fill="#1a1612" font-size="9" font-weight="500">a</text>
+      <text x="264" y="50" fill="#1a1612" font-size="9" font-weight="600" fill="#b44a2d">photo</text>
+      <text x="264" y="82" fill="#1a1612" font-size="9" font-weight="700" fill="#b44a2d">of</text>
+      <text x="264" y="114" fill="#1a1612" font-size="9" font-weight="600" fill="#b44a2d">cat</text>
+      <text x="264" y="146" fill="#1a1612" font-size="9" font-weight="500">.</text>
+
+      <!-- Patch grid labels -->
+      <text x="0" y="172" fill="#9e958a" font-size="7">head</text>
+      <text x="64" y="172" fill="#9e958a" font-size="7">body</text>
+      <text x="128" y="172" fill="#9e958a" font-size="7">paw</text>
+      <text x="192" y="172" fill="#9e958a" font-size="7">tail</text>
+    </g>
+  </svg>
+  <figcaption>Residual-augmented attention rollout for CLIP on a cat photo &mdash; "cat" token attends strongly to the body and paw patches.</figcaption>
+</figure>
 
 <div class="install-bar">
   <span class="prompt">$</span>
   <code>pip install multimodallens</code>
-  <button class="copy-btn" onclick="navigator.clipboard.writeText('pip install multimodallens');this.textContent='Copied'">Copy</button>
+  <button class="copy-btn" aria-label="Copy install command" onclick="try{navigator.clipboard.writeText('pip install multimodallens');this.textContent='Copied';setTimeout(()=>this.textContent='Copy',2000)}catch(e){this.textContent='Select & copy'}">Copy</button>
 </div>
 
-<div class="prose sr">
+<div class="prose">
 
 <h2 id="why">Why this exists</h2>
 
@@ -275,7 +404,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 <blockquote>
   "Vision-language models expose rich internals: attentions, hidden states, embeddings.
   But interpretability tooling remains architecture-specific and difficult to operationalize."
-  <cite>MultimodalLens Research Paper</cite>
+  <cite>MultiModalLens Research Paper</cite>
 </blockquote>
 
 <p>
@@ -293,7 +422,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 </p>
 
 <p>
-  MultimodalLens fills that gap. One adapterized framework. One debugging interface. Faithfulness checks included.
+  <strong>MultiModalLens</strong> fills that gap. One adapterized framework. One debugging interface. Faithfulness checks included.
 </p>
 
 <h3>The timeline</h3>
@@ -314,7 +443,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
   <strong>2024</strong> &mdash; The VLM ecosystem explodes: Qwen2-VL, InternVL, PaliGemma, Pixtral, Idefics3, and dozens more.
 </p>
 <p>
-  <strong>2025</strong> &mdash; MultimodalLens v0.1.0 ships with the adapterized framework and faithfulness diagnostics.
+  <strong>2025</strong> &mdash; MultiModalLens v0.1.0 ships with the adapterized framework and faithfulness diagnostics.
 </p>
 <p>
   <strong>2026</strong> &mdash; v0.2.0 adds mechanistic probes, direct logit attribution, path patching, interactive dashboards, and a PyPI release.
@@ -327,7 +456,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 </p>
 
 <!-- Architecture diagram -->
-<div class="diagram sr">
+<div class="diagram reveal reveal-up">
   <svg viewBox="0 0 700 400" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="IBM Plex Sans,sans-serif" role="img" aria-label="Architecture diagram: Input flows through Core Engine into Adapter Layer, producing Normalized Output">
     <defs>
       <pattern id="dots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
@@ -407,7 +536,7 @@ footer .copy{color:var(--ink-faint);font-size:.78rem}
 <h3>The two APIs</h3>
 
 <p>
-  MultimodalLens exposes two ways to interact with models:
+  MultiModalLens exposes two ways to interact with models:
 </p>
 
 <p>
@@ -457,34 +586,34 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
   23 family aliases map to 4 canonical adapters, plus automatic inference from Hugging Face's <code>AutoConfig</code>:
 </p>
 
-<table class="model-table sr">
+<table class="model-table">
   <thead>
     <tr><th>Adapter</th><th>Families</th><th>Example Checkpoints</th><th>Status</th></tr>
   </thead>
   <tbody>
     <tr>
-      <td>CLIPAdapter</td>
-      <td>clip, siglip, siglip2, altclip, xclip, chinese_clip</td>
-      <td>openai/clip-vit-base-patch32, google/siglip-base-patch16-224</td>
-      <td><span class="status s-ok">Validated</span></td>
+      <td data-label="Adapter">CLIPAdapter</td>
+      <td data-label="Families">clip, siglip, siglip2, altclip, xclip, chinese_clip</td>
+      <td data-label="Checkpoints">openai/clip-vit-base-patch32, google/siglip-base-patch16-224</td>
+      <td data-label="Status"><span class="status s-ok">Validated</span></td>
     </tr>
     <tr>
-      <td>BLIP2Adapter</td>
-      <td>blip2, instructblip</td>
-      <td>Salesforce/blip2-opt-2.7b, Salesforce/instructblip-vicuna-7b</td>
-      <td><span class="status s-part">Partial</span></td>
+      <td data-label="Adapter">BLIP2Adapter</td>
+      <td data-label="Families">blip2, instructblip</td>
+      <td data-label="Checkpoints">Salesforce/blip2-opt-2.7b, Salesforce/instructblip-vicuna-7b</td>
+      <td data-label="Status"><span class="status s-part">Partial</span></td>
     </tr>
     <tr>
-      <td>LlavaAdapter</td>
-      <td>llava, llava_next, qwen2_vl, qwen2_5_vl, mllama, internvl, minicpmv, smolvlm, kosmos2, florence2</td>
-      <td>llava-hf/llava-1.5-7b-hf, Qwen/Qwen2-VL-2B-Instruct, meta-llama/Llama-3.2-11B-Vision</td>
-      <td><span class="status s-part">Partial</span></td>
+      <td data-label="Adapter">LlavaAdapter</td>
+      <td data-label="Families">llava, llava_next, qwen2_vl, qwen2_5_vl, mllama, internvl, minicpmv, smolvlm, kosmos2, florence2</td>
+      <td data-label="Checkpoints">llava-hf/llava-1.5-7b-hf, Qwen/Qwen2-VL-2B-Instruct, meta-llama/Llama-3.2-11B-Vision</td>
+      <td data-label="Status"><span class="status s-part">Partial</span></td>
     </tr>
     <tr>
-      <td>GenericVLMAdapter</td>
-      <td>idefics2, idefics3, paligemma, pixtral</td>
-      <td>HuggingFaceM4/idefics2-8b, google/paligemma-3b-mix-224</td>
-      <td><span class="status s-exp">Experimental</span></td>
+      <td data-label="Adapter">GenericVLMAdapter</td>
+      <td data-label="Families">idefics2, idefics3, paligemma, pixtral</td>
+      <td data-label="Checkpoints">HuggingFaceM4/idefics2-8b, google/paligemma-3b-mix-224</td>
+      <td data-label="Status"><span class="status s-exp">Experimental</span></td>
     </tr>
   </tbody>
 </table>
@@ -496,12 +625,12 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
 <h2 id="methodology">The methodology</h2>
 
 <p>
-  MultimodalLens is not just a visualization dashboard. It combines three complementary evidence channels to avoid over-reliance on any single explanation primitive.
+  MultiModalLens is not just a visualization dashboard. It combines three complementary evidence channels to avoid over-reliance on any single explanation primitive.
 </p>
 
 <h3>Structural signal: attention</h3>
 
-<div class="math-block sr">
+<div class="math-block">
   $$A'_l = \text{normalize}(A_l + I)$$
   $$R = A'_L \cdot A'_{L-1} \cdot \ldots \cdot A'_1$$
 </div>
@@ -512,7 +641,7 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
 
 <h3>Representation signal: alignment</h3>
 
-<div class="math-block sr">
+<div class="math-block">
   $$S_{ij} = \cos(t_i, v_j)$$
   $$\text{salience}_i = \max_j S_{ij}$$
 </div>
@@ -524,7 +653,7 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
 <h3>Causal signal: faithfulness</h3>
 
 <p>
-  Attention is not explanation. MultimodalLens verifies that heatmaps actually reflect causal importance through:
+  Attention is not explanation. MultiModalLens verifies that heatmaps actually reflect causal importance through:
 </p>
 
 <ul>
@@ -537,7 +666,7 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
 <h3>Mechanistic probes</h3>
 
 <p>
-  Beyond visualization, MultimodalLens includes TransformerLens-style mechanistic probes:
+  Beyond visualization, MultiModalLens includes TransformerLens-style mechanistic probes:
 </p>
 
 <ul>
@@ -549,10 +678,10 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
   <li><strong>Causal path patching</strong> &mdash; edge-level intervention analysis between sender and receiver components</li>
 </ul>
 
-<div class="callout sr">
+<div class="callout reveal reveal-left">
   <div class="callout-title">The diagnostic tuple</div>
   <p>
-    For every <strong>(image, prompt)</strong> pair, MultimodalLens produces
+    For every <strong>(image, prompt)</strong> pair, MultiModalLens produces
     <em>A</em> (attention maps), <em>S</em> (alignment matrix),
     <em>g</em> (global score), and <em>F</em> (faithfulness metrics).
     Four convergent signals instead of one heatmap.
@@ -563,19 +692,28 @@ patched <span class="op">=</span> vlm.<span class="fn">run_with_hooks</span>(
   The library also includes weight processing utilities (LayerNorm folding, writing weight centering, unembedding centering) for cleaner decomposition, and a <code>FactoredMatrix</code> class for efficient OV/QK circuit analysis via SVD.
 </p>
 
-<h2>Get started</h2>
+<h2>Your first analysis in three steps</h2>
+
+<ol class="quickstart-steps">
+  <li>
+    <strong>Install</strong> &mdash; <code>pip install multimodallens</code>
+  </li>
+  <li>
+    <strong>Load and run</strong> &mdash; three lines of Python:
+    <div class="code-block" style="margin:.75rem 0 0">
+      <div class="code-header"><div class="dots"><i></i><i></i><i></i></div><span>quickstart.py</span></div>
+      <pre class="code-body"><span class="kw">from</span> multimodallens <span class="kw">import</span> <span class="fn">HookedVLM</span>
+vlm <span class="op">=</span> <span class="fn">HookedVLM</span>.<span class="fn">from_pretrained</span>(<span class="str">"openai/clip-vit-base-patch32"</span>)
+result <span class="op">=</span> vlm.<span class="fn">analyze</span>(<span class="str">"cat.jpg"</span>, <span class="str">"a photo of a cat"</span>)</pre>
+    </div>
+  </li>
+  <li>
+    <strong>Read the output</strong> &mdash; you get attention maps, alignment scores, a global score, and faithfulness metrics. Four signals, not one heatmap.
+  </li>
+</ol>
 
 <p>
-  Install from PyPI, load a model, and start inspecting:
-</p>
-
-<div class="code-block sr">
-  <div class="code-header"><div class="dots"><i></i><i></i><i></i></div><span>terminal</span></div>
-  <pre class="code-body"><span class="fn">pip</span> install multimodallens</pre>
-</div>
-
-<p>
-  The <a href="https://github.com/AKHegde22/MultiModal-Lens">GitHub repository</a> includes five tutorial notebooks covering quickstart, attention deep dives, mechanistic probes, faithfulness testing, and model comparison. There's also a <a href="https://pypi.org/project/multimodallens/">PyPI package</a>, a <a href="docs/methodology.md">methodology document</a>, and a <a href="docs/research_paper_draft.md">research paper draft</a>.
+  Five tutorial notebooks cover everything from quickstart to model comparison. The <a href="https://github.com/AKHegde22/MultiModal-Lens">GitHub repo</a> has the full source, and the <a href="https://pypi.org/project/multimodallens/">PyPI package</a> is ready to install. For the theory behind the methodology, read the <a href="docs/methodology.md">methodology document</a> or the <a href="docs/research_paper_draft.md">research paper draft</a>.
 </p>
 
 </div>
@@ -610,10 +748,10 @@ mobileNav?.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
 // Reveal
 const prefersReduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 if(!prefersReduced){
-  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')})},{threshold:.08,rootMargin:'0px 0px -20px 0px'});
-  document.querySelectorAll('.sr').forEach(el=>obs.observe(el));
+  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('v')})},{threshold:.1,rootMargin:'0px 0px -30px 0px'});
+  document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 }else{
-  document.querySelectorAll('.sr').forEach(el=>el.classList.add('v'));
+  document.querySelectorAll('.reveal').forEach(el=>el.classList.add('v'));
 }
 
 // KaTeX auto-render
